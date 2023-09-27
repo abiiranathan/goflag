@@ -125,6 +125,53 @@ Supported flag types are
 See [Example](./cmd/examples/example.go) for more details.
 Run the example with `./test.sh` to see the output.
 
+### Preview of the help text
+
+```bash
+Usage: ./cli [flags] [subcommand] [flags]
+
+Global Flags:
+  --help     -h: Print help message and exit
+  --config   -c: Path to config file
+  --verbose  -v: Enable verbose output
+  --timeout  -t: Timeout for the request
+  --port     -p: Port to listen on
+  --start    -s: Start time
+  --url      -u: URL to fetch
+  --uuid     -i: UUID to use
+  --ip       -i: IP to use
+  --mac      -m: MAC address to use
+  --email    -e: Email address to use
+  --hostport -h: Host:Port pair to use
+  --file     -f: File path to use
+  --dir      -d: Directory path to use
+
+Subcommands:
+  greet   : Greet a person
+         --help     -h: Print help message and exit
+         --name     -n: Name of the person to greet
+         --greeting -g: Greeting to use
+         --upper    -u: Print in upper case
+
+  version : Print version
+         --help    -h: Print help message and exit
+         --verbose -v: Enable verbose output
+         --short   -s: Print short version
+
+  sleep   : Sleep for a while
+         --help -h: Print help message and exit
+         --time -t: Time to sleep in seconds
+
+  cors    : Enable CORS
+         --help        -h: Print help message and exit
+         --origins     -o: Allowed origins
+         --methods     -m: Allowed methods
+         --headers     -d: Allowed headers
+         --credentials -c: Allow credentials
+
+
+```
+
 ## Contributing
 
 Contributions are welcome. Please open an issue to discuss your ideas before opening a PR.
