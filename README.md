@@ -33,10 +33,6 @@ import (
 	"github.com/abiiranathan/goflag"
 )
 
-// Run the following commands to see the output
-// go run cmd/example.go --help
-// go run cmd/example.go -v -c config.json greet -n Abiira -g "Hello there"
-
 func greetUser(ctx goflag.Getter, cmd goflag.Getter) {
 	name := cmd.GetString("name")
 	greeting := cmd.GetString("greeting")
