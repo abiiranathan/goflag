@@ -48,10 +48,10 @@ func main() {
 	ctx := goflag.NewContext()
 
 	ctx.AddFlag(goflag.String("config", "c", "config.json", "Path to config file", true))
-	ctx.AddFlag(goflag.Bool("verbose", "v", false, "Enable verbose output", false))
+	ctx.AddFlag(goflag.Bool("verbose", "v", false, "Enable verbose output"))
 	ctx.AddFlag(goflag.Duration("timeout", "t", 5*time.Second, "Timeout for the request", true))
-	ctx.AddFlag(goflag.Int("port", "p", 8080, "Port to listen on", false))
-	ctx.AddFlag(goflag.Time("start", "s", time.Now(), "Start time", false))
+	ctx.AddFlag(goflag.Int("port", "p", 8080, "Port to listen on"))
+	ctx.AddFlag(goflag.Time("start", "s", time.Now(), "Start time"))
 
 	ctx.AddFlag(goflag.URL("url", "u", &url.URL{}, "URL to fetch", true))
 	ctx.AddFlag(goflag.UUID("uuid", "i", uuid.UUID{}, "UUID to use", true))
@@ -64,17 +64,17 @@ func main() {
 
 	ctx.AddSubCommand(goflag.SubCommand("greet", "Greet a person", greetUser)).
 		AddFlag(goflag.String("name", "n", "World", "Name of the person to greet", true)).
-		AddFlag(goflag.String("greeting", "g", "Hello", "Greeting to use", false)).
+		AddFlag(goflag.String("greeting", "g", "Hello", "Greeting to use")).
 		Validate(func(a any) (bool, string) {
 			if a.(string) == "World" {
 				return false, "Name cannot be World"
 			}
 			return true, ""
-		}).AddFlag(goflag.Bool("upper", "u", false, "Print in upper case", false))
+		}).AddFlag(goflag.Bool("upper", "u", false, "Print in upper case"))
 
 	ctx.AddSubCommand(goflag.SubCommand("version", "Print version", printVersion)).
-		AddFlag(goflag.Bool("verbose", "v", false, "Enable verbose output", false)).
-		AddFlag(goflag.Bool("short", "s", false, "Print short version", false))
+		AddFlag(goflag.Bool("verbose", "v", false, "Enable verbose output")).
+		AddFlag(goflag.Bool("short", "s", false, "Print short version"))
 
 	ctx.AddSubCommand(goflag.SubCommand("sleep", "Sleep for a while", handleSleep)).
 		AddFlag(goflag.Int("time", "t", 5, "Time to sleep in seconds", true))
@@ -83,7 +83,7 @@ func main() {
 		AddFlag(goflag.StringSlice("origins", "o", []string{"*"}, "Allowed origins", true)).
 		AddFlag(goflag.StringSlice("methods", "m", []string{"GET", "POST"}, "Allowed methods", true)).
 		AddFlag(goflag.StringSlice("headers", "d", []string{"Content-Type"}, "Allowed headers", true)).
-		AddFlag(goflag.Bool("credentials", "c", false, "Allow credentials", false))
+		AddFlag(goflag.Bool("credentials", "c", false, "Allow credentials"))
 
 	// time
 

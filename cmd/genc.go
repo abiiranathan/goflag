@@ -47,15 +47,18 @@ import (
 `
 
 func Constructor(name string, valueType string, flagType string) string {
-	return fmt.Sprintf(`func %s(name, shortName string, value %s, usage string, required bool) *gflag {
-	return &gflag{
+	return fmt.Sprintf(`func %s(name, shortName string, value %s, usage string, required... bool) *gflag {
+	flag := &gflag{
 		name:      name,
 		shortName: shortName,
 		value:     value,
 		flagType:  %s,
 		usage:     usage,
-		required:  required,
 	}
+	if len(required) > 0 {
+		flag.required = required[0]
+	}
+	return flag
 }
 
 `, name, valueType, flagType)
