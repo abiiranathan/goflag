@@ -68,6 +68,18 @@ func NewContext() *Context {
 		flags: []*gflag{
 			{name: "help", shortName: "h", flagType: flagBool, usage: "Print help message and exit"},
 		},
+		subcommands: []*subcommand{
+			{
+				name:        "completions",
+				description: "Generate shell completions[zsh, bash]",
+				Handler:     GenerateCompletions,
+				flags: []*gflag{
+					{name: "zsh", flagType: flagBool, value: false, usage: "Generate Zsh Completion"},
+					{name: "bash", flagType: flagBool, value: false, usage: "Generate Zsh Completion"},
+					{name: "out", flagType: flagString, value: "", usage: "Output file. Default [stdout]"},
+				},
+			},
+		},
 	}
 }
 
@@ -82,10 +94,14 @@ func (ctx *Context) AddFlag(flag *gflag) *gflag {
 
 func (ctx *Context) Get(name string) any {
 	for _, flag := range ctx.flags {
-		if flag.name == name || flag.shortName == name {
+		if flag.name == name {
+			return flag.value
+		}
+		if flag.shortName != "" && flag.shortName == name {
 			return flag.value
 		}
 	}
+
 	panic(fmt.Sprintf("flag %q not found", name))
 }
 

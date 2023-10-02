@@ -49,7 +49,11 @@ func (cmd *subcommand) AddFlag(f *gflag) *subcommand {
 
 func (cmd *subcommand) Get(name string) any {
 	for _, flag := range cmd.flags {
-		if flag.name == name || flag.shortName == name {
+		if flag.name == name {
+			return flag.value
+		}
+
+		if flag.shortName != "" && flag.shortName == name {
 			return flag.value
 		}
 	}

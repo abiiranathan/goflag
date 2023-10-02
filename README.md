@@ -172,6 +172,20 @@ Subcommands:
 
 ```
 
+### Generate completion scripts
+
+_goflag_ automatically adds a subcommand to generate `bash` and `zsh` scripts for your CLIs.
+
+```bash
+mycli completions -zsh -out=script.sh
+```
+
+```bash
+source script.sh
+```
+
+If no output file is provided, the script is printed to stdout.
+
 ## Contributing
 
 Contributions are welcome. Please open an issue to discuss your ideas before opening a PR.

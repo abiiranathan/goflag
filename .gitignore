@@ -1,2 +1,4 @@
 .env
 build
+*.sh
+cmd/examples/examples

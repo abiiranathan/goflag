@@ -47,20 +47,20 @@ func handleCors(ctx goflag.Getter, cmd goflag.Getter) {
 func main() {
 	ctx := goflag.NewContext()
 
-	ctx.AddFlag(goflag.String("config", "c", "config.json", "Path to config file", true))
+	ctx.AddFlag(goflag.String("config", "c", "config.json", "Path to config file", false))
 	ctx.AddFlag(goflag.Bool("verbose", "v", false, "Enable verbose output"))
-	ctx.AddFlag(goflag.Duration("timeout", "t", 5*time.Second, "Timeout for the request", true))
+	ctx.AddFlag(goflag.Duration("timeout", "t", 5*time.Second, "Timeout for the request", false))
 	ctx.AddFlag(goflag.Int("port", "p", 8080, "Port to listen on"))
 	ctx.AddFlag(goflag.Time("start", "s", time.Now(), "Start time"))
 
-	ctx.AddFlag(goflag.URL("url", "u", &url.URL{}, "URL to fetch", true))
-	ctx.AddFlag(goflag.UUID("uuid", "i", uuid.UUID{}, "UUID to use", true))
-	ctx.AddFlag(goflag.IP("ip", "i", net.IP{}, "IP to use", true))
-	ctx.AddFlag(goflag.MAC("mac", "m", net.HardwareAddr{}, "MAC address to use", true))
-	ctx.AddFlag(goflag.Email("email", "e", "", "Email address to use", true))
-	ctx.AddFlag(goflag.HostPortPair("hostport", "h", "", "Host:Port pair to use", true))
-	ctx.AddFlag(goflag.FilePath("file", "f", "", "File path to use", true))
-	ctx.AddFlag(goflag.DirPath("dir", "d", "", "Directory path to use", true))
+	ctx.AddFlag(goflag.URL("url", "u", &url.URL{}, "URL to fetch", false))
+	ctx.AddFlag(goflag.UUID("uuid", "i", uuid.UUID{}, "UUID to use", false))
+	ctx.AddFlag(goflag.IP("ip", "i", net.IP{}, "IP to use", false))
+	ctx.AddFlag(goflag.MAC("mac", "m", net.HardwareAddr{}, "MAC address to use", false))
+	ctx.AddFlag(goflag.Email("email", "e", "", "Email address to use", false))
+	ctx.AddFlag(goflag.HostPortPair("hostport", "h", "", "Host:Port pair to use", false))
+	ctx.AddFlag(goflag.FilePath("file", "f", "", "File path to use", false))
+	ctx.AddFlag(goflag.DirPath("dir", "d", "", "Directory path to use", false))
 
 	ctx.AddSubCommand(goflag.SubCommand("greet", "Greet a person", greetUser)).
 		AddFlag(goflag.String("name", "n", "World", "Name of the person to greet", true)).
@@ -84,8 +84,6 @@ func main() {
 		AddFlag(goflag.StringSlice("methods", "m", []string{"GET", "POST"}, "Allowed methods", true)).
 		AddFlag(goflag.StringSlice("headers", "d", []string{"Content-Type"}, "Allowed headers", true)).
 		AddFlag(goflag.Bool("credentials", "c", false, "Allow credentials"))
-
-	// time
 
 	// Parse the command line arguments and return the matching subcommand
 	subcmd, err := ctx.Parse(os.Args)
