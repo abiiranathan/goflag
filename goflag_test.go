@@ -290,39 +290,28 @@ func TestAddCommand(t *testing.T) {
 		Handler: func(ctx Getter, subCommand Getter) {
 			fmt.Println("Test command")
 		},
-		flags: []*gflag{
-			{
-				name:      "name",
-				flagType:  flagString,
-				value:     "",
-				shortName: "n",
-				required:  true,
-				usage:     "Your name",
-				validator: func(value any) (bool, string) {
-					return value != "", "Name cannot be empty"
-				},
-			},
-		},
-	})
+	}).AddFlag(String("name", "n", "", "Your name", true))
 
-	if len(ctx.subcommands) != 1 {
-		t.Errorf("Expected 1 subcommand, but got %v", len(ctx.subcommands))
+	// ctx.subCommands[0] is completions automatically inserted with NewContext.
+	// subcommand[0].flags[0] is the --help flag auto inserted by .AddFlag.
+	if len(ctx.subcommands) != 2 {
+		t.Errorf("Expected 2 subcommand, but got %v", len(ctx.subcommands))
 	}
 
-	if ctx.subcommands[0].name != "test" {
-		t.Errorf("Expected subcommand name to be 'test', but got '%v'", ctx.subcommands[0].name)
+	if ctx.subcommands[1].name != "test" {
+		t.Errorf("Expected subcommand name to be 'test', but got '%v'", ctx.subcommands[1].name)
 	}
 
-	if ctx.subcommands[0].description != "Test command" {
-		t.Errorf("Expected subcommand usage to be 'Test command', but got '%v'", ctx.subcommands[0].description)
+	if ctx.subcommands[1].description != "Test command" {
+		t.Errorf("Expected subcommand usage to be 'Test command', but got '%v'", ctx.subcommands[1].description)
 	}
 
-	if len(ctx.subcommands[0].flags) != 2 {
-		t.Errorf("Expected 2 flags, but got %v", len(ctx.subcommands[0].flags))
+	if len(ctx.subcommands[1].flags) != 2 {
+		t.Errorf("Expected 2 flags, but got %v", len(ctx.subcommands[1].flags))
 	}
 
-	if ctx.subcommands[0].flags[0].name != "name" {
-		t.Errorf("Expected flag name to be 'name', but got '%v'", ctx.subcommands[0].flags[0].name)
+	if ctx.subcommands[1].flags[1].name != "name" {
+		t.Errorf("Expected flag name to be 'name', but got '%v'", ctx.subcommands[1].flags[1].name)
 	}
 }
 
