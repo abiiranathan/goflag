@@ -1,6 +1,6 @@
 # goflag
 
-[![GoDoc](https://godoc.org/github.com/bradleyjkemp/goflag?status.svg)](https://godoc.org/github.com/bradleyjkemp/goflag)
+[![GoDoc](https://godoc.org/github.com/abiiranathan/goflag?status.svg)](https://godoc.org/github.com/abiiranathan/goflag)
 
 A simple library for parsing command line arguments. It is designed to be a drop-in replacement for the standard library's `flag` package.
 
@@ -43,7 +43,7 @@ func greetUser(ctx goflag.Getter, cmd goflag.Getter) {
 
 }
 
-func printVersion(ctx *goflag.Context, cmd *goflag.Subcmd) {
+func printVersion(ctx *goflag.Getter, cmd *goflag.Getter) {
 	if cmd.Get("short").(bool) {
 		fmt.Println("1.0.0")
 	} else {
