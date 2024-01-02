@@ -70,5 +70,5 @@ func (cmd *subcommand) Validate(validator func(any) (bool, string)) *subcommand 
 }
 
 func (cmd *subcommand) PrintUsage(w io.Writer) {
-	printSubCommand(cmd, w, 0, "")
+	printSubCommand(cmd, w)
 }

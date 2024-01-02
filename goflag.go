@@ -364,12 +364,15 @@ func isHelpFlag(name string) bool {
 
 // Print a subcommand to the writer.
 // Called by PrintUsage for each subcommand.
-func printSubCommand(cmd *subcommand, w io.Writer, longestSubCommandName int, indent string) {
-	fmt.Fprintf(w, "%s%-*s : %s", indent, longestSubCommandName, cmd.name, cmd.description)
+func printSubCommand(cmd *subcommand, w io.Writer) {
+	fmt.Fprintf(w, "%s: %s", cmd.name, cmd.description)
 	fmt.Fprintln(w)
 
 	longestFlagName := 0
 	for _, flag := range cmd.flags {
+		if flag.name == "help" {
+			continue
+		}
 		if len(flag.name) > longestFlagName {
 			longestFlagName = len(flag.name)
 		}
@@ -377,7 +380,10 @@ func printSubCommand(cmd *subcommand, w io.Writer, longestSubCommandName int, in
 
 	// print the subcommand flags.
 	for _, flag := range cmd.flags {
-		printFlag(flag, w, longestFlagName, "         ")
+		if flag.name == "help" {
+			continue
+		}
+		printFlag(flag, w, longestFlagName, "    ")
 	}
 
 	fmt.Fprintln(w)
@@ -406,9 +412,9 @@ func (ctx *Context) PrintUsage(w io.Writer) {
 		}
 	}
 
-	fmt.Fprintf(w, "Usage: %s [flags] [subcommand] [flags]\n", os.Args[0])
+	fmt.Fprintf(w, "Usage: %s [global flags] [subcommand] [subcommand flags]\n", os.Args[0])
 	// print the global flags.
-	fmt.Fprintln(w, "Global Flags:")
+	fmt.Fprintf(w, "Global Flags:\n")
 	for _, flag := range ctx.flags {
 		printFlag(flag, w, longestFlagName, "  ")
 	}
@@ -416,8 +422,8 @@ func (ctx *Context) PrintUsage(w io.Writer) {
 	fmt.Fprintln(w)
 
 	// print the subcommands.
-	fmt.Fprintln(w, "Subcommands:")
+	fmt.Fprintf(w, "Subcommands:\n")
 	for _, cmd := range ctx.subcommands {
-		printSubCommand(cmd, w, longestSubCommandName, "  ")
+		printSubCommand(cmd, w)
 	}
 }
