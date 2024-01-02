@@ -56,6 +56,12 @@ type gflag struct {
 	validator func(any) (bool, string)
 }
 
+// Add validator to last flag in the subcommand chain. If no flag exists, it panics.
+func (flag *gflag) Validate(validator func(any) (bool, string)) *gflag {
+	flag.validator = validator
+	return flag
+}
+
 // Global flag context. Stores global flags and subcommands.
 type Context struct {
 	flags       []*gflag
