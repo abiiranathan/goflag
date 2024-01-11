@@ -12,10 +12,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// Run the following commands to see the output
-// go run cmd/examples/example.go
-// go run cmd/examples/example.go -v -c config.json greet -n Abiira -g "Hello there"
-
 var (
 	name     string = "World"
 	greeting string = "Hello"

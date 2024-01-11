@@ -28,23 +28,50 @@ package main
 
 import (
 	"fmt"
+	"log"
+	"net"
+	"net/url"
 	"os"
+	"time"
 
 	"github.com/abiiranathan/goflag"
+	"github.com/google/uuid"
 )
 
-func greetUser(ctx goflag.Getter, cmd goflag.Getter) {
-	name := cmd.GetString("name")
-	greeting := cmd.GetString("greeting")
+var (
+	name     string = "World"
+	greeting string = "Hello"
+	short    bool
+
+	urlValue url.URL
+	uuidVal  uuid.UUID
+	ipVal    net.IP
+	macVal   net.HardwareAddr
+	emailVal string
+	hpVal    string
+	fileVal  string
+	dirVal   string
+
+	origins       []string = []string{"*"}
+	methods       []string = []string{"GET", "POST"}
+	headers       []string = []string{"Content-Type"}
+	credentials   bool
+	verbose       bool
+	config        string        = "config.json"
+	port          int           = 8080
+	start         time.Time     = time.Now()
+	timeout       time.Duration = 5 * time.Second
+	durationValue               = 5
+
+	upperValue bool
+)
+
+func greetUser() {
 	fmt.Println(greeting, name)
-
-	// you have access to global flags
-	ctx.GetBool("verbose") // etc
-
 }
 
-func printVersion(ctx *goflag.Context, cmd *goflag.Subcmd) {
-	if cmd.Get("short").(bool) {
+func printVersion() {
+	if short {
 		fmt.Println("1.0.0")
 	} else {
 		fmt.Println("1.0.0")
@@ -53,25 +80,52 @@ func printVersion(ctx *goflag.Context, cmd *goflag.Subcmd) {
 	}
 }
 
+func handleSleep() {
+	time.Sleep(time.Duration(durationValue) * time.Second)
+}
+
+func handleCors() {
+	fmt.Println("Origins: ", origins)
+	fmt.Println("Methods: ", methods)
+	fmt.Println("Headers: ", headers)
+	fmt.Println("Credentials: ", credentials)
+}
+
 func main() {
+	log.SetFlags(log.Lshortfile)
 	ctx := goflag.NewContext()
 
-	ctx.AddFlag(goflag.String("config", "c", "config.json", "Path to config file", true))
-	ctx.AddFlag(goflag.Bool("verbose", "v", false, "Enable verbose output", false))
+	ctx.AddFlag(goflag.FlagString, "config", "c", &config, "Path to config file", false)
+	ctx.AddFlag(goflag.FlagBool, "verbose", "v", &verbose, "Enable verbose output", false)
+	ctx.AddFlag(goflag.FlagDuration, "timeout", "t", &timeout, "Timeout for the request", false)
+	ctx.AddFlag(goflag.FlagInt, "port", "p", &port, "Port to listen on", false)
+	ctx.AddFlag(goflag.FlagString, "hostport", "h", &hpVal, "Host:Port to listen on", false)
+	ctx.AddFlag(goflag.FlagTime, "start", "s", &start, "Start time", false)
+	ctx.AddFlag(goflag.FlagURL, "url", "u", &urlValue, "URL to fetch", false)
+	ctx.AddFlag(goflag.FlagUUID, "uuid", "i", &uuidVal, "UUID to use", false)
+	ctx.AddFlag(goflag.FlagIP, "ip", "i", &ipVal, "IP to use", false)
+	ctx.AddFlag(goflag.FlagMAC, "mac", "m", &macVal, "MAC address to use", false)
+	ctx.AddFlag(goflag.FlagEmail, "email", "e", &emailVal, "Email address to use", false)
+	ctx.AddFlag(goflag.FlagFilePath, "file", "f", &fileVal, "File path to use", false)
+	ctx.AddFlag(goflag.FlagDirPath, "dir", "d", &dirVal, "Directory path to use", false)
 
-	ctx.AddSubCommand(goflag.SubCommand("greet", "Greet a person", greetUser)).
-		AddFlag(goflag.String("name", "n", "World", "Name of the person to greet", true)).
-		AddFlag(goflag.String("greeting", "g", "Hello", "Greeting to use", false)).
-		Validate(func(a any) (bool, string) {
-			if a.(string) == "World" {
-				return false, "ERR: Name cannot be World"
-			}
-			return true, ""
-		}).AddFlag(goflag.Bool("upper", "u", false, "Print in upper case", false))
+	ctx.AddSubCommand("greet", "Greet a person", greetUser).
+		AddFlag(goflag.FlagString, "name", "n", &name, "Name of the person to greet", true).
+		AddFlag(goflag.FlagString, "greeting", "g", &greeting, "Greeting to use", false).
+		AddFlag(goflag.FlagBool, "upper", "u", &upperValue, "Print in upper case", false)
 
-	ctx.AddSubCommand(goflag.SubCommand("version", "Print version", printVersion)).
-		AddFlag(goflag.Bool("verbose", "v", false, "Enable verbose output", false)).
-		AddFlag(goflag.Bool("short", "s", false, "Print short version", false))
+	ctx.AddSubCommand("version", "Print version", printVersion).
+		AddFlag(goflag.FlagBool, "verbose", "v", &verbose, "Enable verbose output", false).
+		AddFlag(goflag.FlagBool, "short", "s", &short, "Print short version", false)
+
+	ctx.AddSubCommand("sleep", "Sleep for a while", handleSleep).
+		AddFlag(goflag.FlagInt, "time", "t", &durationValue, "Time to sleep in seconds", true)
+
+	ctx.AddSubCommand("cors", "Enable CORS", handleCors).
+		AddFlag(goflag.FlagStringSlice, "origins", "o", &origins, "Allowed origins", true).
+		AddFlag(goflag.FlagStringSlice, "methods", "m", &methods, "Allowed methods", true).
+		AddFlag(goflag.FlagStringSlice, "headers", "d", &headers, "Allowed headers", true).
+		AddFlag(goflag.FlagBool, "credentials", "c", &credentials, "Allow credentials", false)
 
 	// Parse the command line arguments and return the matching subcommand
 	subcmd, err := ctx.Parse(os.Args)
@@ -80,13 +134,37 @@ func main() {
 	}
 
 	if subcmd != nil {
-		subcmd.Handler(ctx, subcmd)
+		subcmd.Handler()
 	}
 
-	fmt.Println(ctx.GetString("config"))
-	fmt.Println(ctx.GetBool("verbose"))
+	// Print the values
+	fmt.Println("Config: ", config)
+	fmt.Println("Verbose: ", verbose)
+	fmt.Println("Timeout: ", timeout)
+	fmt.Println("Port: ", port)
+	fmt.Println("Start: ", start)
+
+	fmt.Println("URL: ", urlValue)
+	fmt.Println("UUID: ", uuidVal)
+	fmt.Println("IP: ", ipVal)
+	fmt.Println("MAC: ", macVal)
+	fmt.Println("Email: ", emailVal)
+	fmt.Println("HostPort: ", hpVal)
+	fmt.Println("File: ", fileVal)
+	fmt.Println("Dir: ", dirVal)
+
+	fmt.Println("Origins: ", origins)
+	fmt.Println("Methods: ", methods)
+	fmt.Println("Headers: ", headers)
+	fmt.Println("Credentials: ", credentials)
+
+	fmt.Println("Name: ", name)
+	fmt.Println("Greeting: ", greeting)
+	fmt.Println("Short: ", short)
+	fmt.Println("Duration: ", durationValue)
 
 }
+
 
 ```
 
@@ -128,63 +206,8 @@ Run the example with `./test.sh` to see the output.
 ### Preview of the help text
 
 ```bash
-Usage: ./cli [flags] [subcommand] [flags]
-
-Global Flags:
-  --help     -h: Print help message and exit
-  --config   -c: Path to config file
-  --verbose  -v: Enable verbose output
-  --timeout  -t: Timeout for the request
-  --port     -p: Port to listen on
-  --start    -s: Start time
-  --url      -u: URL to fetch
-  --uuid     -i: UUID to use
-  --ip       -i: IP to use
-  --mac      -m: MAC address to use
-  --email    -e: Email address to use
-  --hostport -h: Host:Port pair to use
-  --file     -f: File path to use
-  --dir      -d: Directory path to use
-
-Subcommands:
-  greet   : Greet a person
-         --help     -h: Print help message and exit
-         --name     -n: Name of the person to greet
-         --greeting -g: Greeting to use
-         --upper    -u: Print in upper case
-
-  version : Print version
-         --help    -h: Print help message and exit
-         --verbose -v: Enable verbose output
-         --short   -s: Print short version
-
-  sleep   : Sleep for a while
-         --help -h: Print help message and exit
-         --time -t: Time to sleep in seconds
-
-  cors    : Enable CORS
-         --help        -h: Print help message and exit
-         --origins     -o: Allowed origins
-         --methods     -m: Allowed methods
-         --headers     -d: Allowed headers
-         --credentials -c: Allow credentials
-
-
+Usage: ./cli --help
 ```
-
-### Generate completion scripts
-
-_goflag_ automatically adds a subcommand to generate `bash` and `zsh` scripts for your CLIs.
-
-```bash
-mycli completions -zsh -out=script.sh
-```
-
-```bash
-source script.sh
-```
-
-If no output file is provided, the script is printed to stdout.
 
 ## Contributing
 
