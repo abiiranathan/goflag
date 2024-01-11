@@ -3,69 +3,46 @@ package goflag
 import (
 	"fmt"
 	"io"
-	"time"
+	"reflect"
 )
-
-type Getter interface {
-	Get(name string) any
-	GetString(name string) string
-	GetInt(name string) int
-	GetInt64(name string) int64
-	GetFloat32(name string) float32
-	GetFloat64(name string) float64
-	GetBool(name string) bool
-	GetStringSlice(name string) []string
-	GetRune(name string) rune
-	GetTime(name string) time.Time
-	GetDuration(name string) time.Duration
-	GetIntSlice(name string) []int
-}
 
 // A subcommand. It can have its own flags.
 type subcommand struct {
-	name        string   // Subcommand name. used as a key to find the subcommand.
-	description string   // Description of what this subcommand does.
-	Handler     Handler  // Subcommand callback handler. Will be invoked by user if it matches.
-	flags       []*gflag // subcommand flags.
-}
-
-// Create a new subcommand.
-func SubCommand(name, description string, handler Handler) *subcommand {
-	return &subcommand{
-		name:        name,
-		description: description,
-		Handler:     handler,
-	}
+	name        string  // Subcommand name. used as a key to find the subcommand.
+	description string  // Description of what this subcommand does.
+	Handler     func()  // Subcommand callback handler. Will be invoked by user if it matches.
+	flags       []*Flag // subcommand flags.
 }
 
 // Add a flag to a subcommand.
-func (cmd *subcommand) AddFlag(f *gflag) *subcommand {
-	if f.name == "" {
+func (cmd *subcommand) AddFlag(flagType FlagType, name, shortName string, valuePtr any, usage string, required bool, validator ...func(any) (bool, string)) *subcommand {
+	if name == "" {
 		panic("flag name can't be empty")
 	}
-	cmd.flags = append(cmd.flags, f)
-	return cmd
-}
 
-func (cmd *subcommand) Get(name string) any {
-	for _, flag := range cmd.flags {
-		if flag.name == name {
-			return flag.value
-		}
-
-		if flag.shortName != "" && flag.shortName == name {
-			return flag.value
-		}
+	// check the flag value is a valid pointer.
+	if valuePtr == nil {
+		panic("flag value can't be nil")
 	}
-	panic(fmt.Sprintf("flag %q not found", name))
-}
 
-// Add validator to last flag in the subcommand chain. If no flag exists, it panics.
-func (cmd *subcommand) Validate(validator func(any) (bool, string)) *subcommand {
-	if len(cmd.flags) == 0 {
-		panic("no flags to validate")
+	valueType := reflect.TypeOf(valuePtr)
+	if valueType.Kind() != reflect.Ptr {
+		panic(fmt.Errorf("flag value for %s must be a pointer, got %s", name, valueType.Kind()))
 	}
-	cmd.flags[len(cmd.flags)-1].validator = validator
+
+	flag := &Flag{
+		FlagType:  flagType,
+		Name:      name,
+		ShortName: shortName,
+		Value:     valuePtr,
+		Usage:     usage,
+		Required:  required,
+	}
+
+	if len(validator) > 0 {
+		flag.Validator = validator[0]
+	}
+	cmd.flags = append(cmd.flags, flag)
 	return cmd
 }
 

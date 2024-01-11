@@ -15,48 +15,142 @@ import (
 )
 
 // Returns the converted value from string based on flag type.
-func parseFlagValue(flag *gflag, value string) (any, error) {
-	switch flag.flagType {
-	case flagString:
-		return value, nil
-	case flagInt:
-		return ParseInt(value)
-	case flagInt64:
-		return ParseInt64(value)
-	case flagFloat32:
-		return ParseFloat32(value)
-	case flagFloat64:
-		return ParseFloat64(value)
-	case flagBool:
-		return ParseBool(value)
-	case flagStringSlice:
-		return ParseStringSlice(value)
-	case flagIntSlice:
-		return ParseIntSlice(value)
-	case flagRune:
-		return ParseRune(value)
-	case flagDuration:
-		return ParseDuration(value)
-	case flagTime:
-		return ParseTime(value)
-	case flagIP:
-		return ParseIP(value)
-	case flagFilePath:
-		return ParseFilePath(value)
-	case flagDirPath:
-		return ParseDirPath(value)
-	case flagEmail:
-		return ParseEmail(value)
-	case flagURL:
-		return ParseUrl(value)
-	case flagUUID:
-		return ParseUUID(value)
-	case flagHostPortPair:
-		return ParseHostPort(value)
-	case flagMAC:
-		return ParseMAC(value)
+func parseFlagValue(flag *Flag, value string) error {
+	switch flag.FlagType {
+	case FlagString:
+		*flag.Value.(*string) = value
+		return nil
+	case FlagInt:
+		intValue, err := ParseInt(value)
+		if err != nil {
+			return err
+		}
+		*flag.Value.(*int) = intValue
+		return nil
+	case FlagInt64:
+		int64Value, err := ParseInt64(value)
+		if err != nil {
+			return err
+		}
+		*flag.Value.(*int64) = int64Value
+		return nil
+	case FlagFloat32:
+		float32Value, err := ParseFloat32(value)
+		if err != nil {
+			return err
+		}
+		*flag.Value.(*float32) = float32Value
+		return nil
+	case FlagFloat64:
+		float64Value, err := ParseFloat64(value)
+		if err != nil {
+			return err
+		}
+		*flag.Value.(*float64) = float64Value
+		return nil
+	case FlagBool:
+		boolValue, err := ParseBool(value)
+		if err != nil {
+			return err
+		}
+		*flag.Value.(*bool) = boolValue
+		return nil
+	case FlagStringSlice:
+		stringSliceValue, err := ParseStringSlice(value)
+		if err != nil {
+			return err
+		}
+		*flag.Value.(*[]string) = stringSliceValue
+		return nil
+
+	case FlagIntSlice:
+		intSliceValue, err := ParseIntSlice(value)
+		if err != nil {
+			return err
+		}
+		*flag.Value.(*[]int) = intSliceValue
+		return nil
+	case FlagRune:
+		runeValue, err := ParseRune(value)
+		if err != nil {
+			return err
+		}
+		*flag.Value.(*rune) = runeValue
+		return nil
+	case FlagDuration:
+		durationValue, err := ParseDuration(value)
+		if err != nil {
+			return err
+		}
+		*flag.Value.(*time.Duration) = durationValue
+		return nil
+	case FlagTime:
+		timeValue, err := ParseTime(value)
+		if err != nil {
+			return err
+		}
+		*flag.Value.(*time.Time) = timeValue
+		return nil
+	case FlagIP:
+		ipValue, err := ParseIP(value)
+		if err != nil {
+			return err
+		}
+		*flag.Value.(*net.IP) = ipValue
+		return nil
+	case FlagFilePath:
+		filePath, err := ParseFilePath(value)
+		if err != nil {
+			return err
+		}
+		*flag.Value.(*string) = filePath
+		return nil
+	case FlagDirPath:
+		dirPath, err := ParseDirPath(value)
+		if err != nil {
+			return err
+		}
+		*flag.Value.(*string) = dirPath
+		return nil
+	case FlagEmail:
+		email, err := ParseEmail(value)
+		if err != nil {
+			return err
+		}
+		*flag.Value.(*string) = email
+		return nil
+	case FlagURL:
+		uri, err := ParseUrl(value)
+		if err != nil {
+			return err
+		}
+		*flag.Value.(*url.URL) = *uri
+		return nil
+	case FlagUUID:
+		uuidValue, err := ParseUUID(value)
+		if err != nil {
+			return err
+		}
+		*flag.Value.(*uuid.UUID) = uuidValue
+		return nil
+	case FlagHostPortPair:
+		hostPortPair, err := ParseHostPort(value)
+		if err != nil {
+			return err
+		}
+		*flag.Value.(*string) = hostPortPair
+		return nil
+	case FlagMAC:
+		mac, err := ParseMAC(value)
+		if err != nil {
+			return err
+		}
+		*flag.Value.(*net.HardwareAddr) = mac
+		return nil
+
 	}
-	return nil, fmt.Errorf("unsupported flag type %s", flag.flagType.String())
+
+	return fmt.Errorf("unsupported flag type %s", flag.FlagType.String())
 }
 
 // Parse a string to an int.
@@ -97,6 +191,11 @@ func ParseFloat64(value string) (float64, error) {
 
 // Parse a string to a bool.
 func ParseBool(value string) (bool, error) {
+	// if value is empty, return true.(default value e.g -v)
+	if value == "" {
+		return true, nil
+	}
+
 	result, err := strconv.ParseBool(value)
 	if err != nil {
 		return false, fmt.Errorf("invalid bool value for flag %s", value)
