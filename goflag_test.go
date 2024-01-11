@@ -15,7 +15,7 @@ func TestParse(t *testing.T) {
 		height int    = 0
 	)
 
-	ctx.subcommands = []*subcommand{
+	ctx.subcommands = []*Subcommand{
 		{
 			name:        "test",
 			description: "Test command",
@@ -196,7 +196,7 @@ func TestPrintUsage(t *testing.T) {
 				Usage:     "Age of the person",
 			},
 		},
-		subcommands: []*subcommand{
+		subcommands: []*Subcommand{
 			{
 				name:        "add",
 				description: "Add a new person",

@@ -60,7 +60,7 @@ func (flag *Flag) Validate(validator func(any) (bool, string)) *Flag {
 // Global flag context. Stores global flags and subcommands.
 type Context struct {
 	flags       []*Flag
-	subcommands []*subcommand
+	subcommands []*Subcommand
 }
 
 // Create a new flag context.
@@ -106,7 +106,7 @@ func (ctx *Context) AddFlag(flagType FlagType, name, shortName string, valuePtr 
 }
 
 // Add a subcommand to the context.
-func (ctx *Context) AddSubCommand(name, description string, handler func()) *subcommand {
+func (ctx *Context) AddSubCommand(name, description string, handler func()) *Subcommand {
 	if handler == nil {
 		panic("subcommand can not be registered with nil handler")
 	}
@@ -118,7 +118,7 @@ func (ctx *Context) AddSubCommand(name, description string, handler func()) *sub
 		panic("subcommand description can't be empty")
 	}
 
-	cmd := &subcommand{
+	cmd := &Subcommand{
 		name:        name,
 		description: description,
 		Handler:     handler,
@@ -137,14 +137,14 @@ func (ctx *Context) AddSubCommand(name, description string, handler func()) *sub
 //
 // Populates the values of the flags and also finds the matching subcommand.
 // Returns the matching subcommand.
-func (ctx *Context) Parse(argv []string) (*subcommand, error) {
-	if (argv == nil) || (len(argv) <= 1) {
-		return nil, fmt.Errorf("can not call Parse() without at least 2 arguments")
+func (ctx *Context) Parse(argv []string) (*Subcommand, error) {
+	if len(argv) < 2 {
+		return nil, nil
 	}
 
 	// skip the first argument which is the program name.
 	argv = argv[1:]
-	var subcmd *subcommand = nil
+	var subcmd *Subcommand = nil
 	subCommandIndex := -1
 
 	// store processed flags.
@@ -364,7 +364,7 @@ func isHelpFlag(name string) bool {
 
 // Print a subcommand to the writer.
 // Called by PrintUsage for each subcommand.
-func printSubCommand(cmd *subcommand, w io.Writer) {
+func printSubCommand(cmd *Subcommand, w io.Writer) {
 	fmt.Fprintf(w, "%s: %s", cmd.name, cmd.description)
 	fmt.Fprintln(w)
 

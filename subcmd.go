@@ -6,8 +6,8 @@ import (
 	"reflect"
 )
 
-// A subcommand. It can have its own flags.
-type subcommand struct {
+// A Subcommand. It can have its own flags.
+type Subcommand struct {
 	name        string  // Subcommand name. used as a key to find the subcommand.
 	description string  // Description of what this subcommand does.
 	Handler     func()  // Subcommand callback handler. Will be invoked by user if it matches.
@@ -15,7 +15,7 @@ type subcommand struct {
 }
 
 // Add a flag to a subcommand.
-func (cmd *subcommand) AddFlag(flagType FlagType, name, shortName string, valuePtr any, usage string, required bool, validator ...func(any) (bool, string)) *subcommand {
+func (cmd *Subcommand) AddFlag(flagType FlagType, name, shortName string, valuePtr any, usage string, required bool, validator ...func(any) (bool, string)) *Subcommand {
 	if name == "" {
 		panic("flag name can't be empty")
 	}
@@ -46,6 +46,6 @@ func (cmd *subcommand) AddFlag(flagType FlagType, name, shortName string, valueP
 	return cmd
 }
 
-func (cmd *subcommand) PrintUsage(w io.Writer) {
+func (cmd *Subcommand) PrintUsage(w io.Writer) {
 	printSubCommand(cmd, w)
 }
