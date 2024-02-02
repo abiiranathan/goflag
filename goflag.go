@@ -340,14 +340,20 @@ func parseFlags(flags *[]*Flag, name string, i int, argv []string) (*Flag, error
 // Called by PrintUsage for each flag.
 func printFlag(flag *Flag, w io.Writer, longestFlagName int, indent string) {
 	fmt.Fprintf(w, "%s--%-*s ", indent, longestFlagName, flag.Name)
+	valid := reflect.ValueOf(flag.Value).IsValid()
+	value := ""
+	if valid {
+		value = fmt.Sprintf("%v", reflect.ValueOf(flag.Value).Elem().Interface())
+	}
 
 	if flag.ShortName != "" {
-		fmt.Fprintf(w, "-%s: %s[default: %v]\n", flag.ShortName, flag.Usage, flag.Value)
+		fmt.Fprintf(w, "-%s: %s[default: %v]\n", flag.ShortName, flag.Usage, value)
 	} else {
-		fmt.Fprintf(w, "%s[default: %v]\n", flag.Usage, flag.Value)
+		fmt.Fprintf(w, "%s[default: %v]\n", flag.Usage, value)
 	}
 }
 
+// Parse the flag value and set the flag value.
 func findFlag(flags []*Flag, name string) *Flag {
 	for index := range flags {
 		flag := flags[index]
