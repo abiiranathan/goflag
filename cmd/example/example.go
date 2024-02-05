@@ -69,7 +69,7 @@ func main() {
 	log.SetFlags(log.Lshortfile)
 	ctx := goflag.NewContext()
 
-	ctx.AddFlag(goflag.FlagString, "config", "c", &config, "Path to config file", false)
+	ctx.AddFlag(goflag.FlagString, "config", "c", &config, "Path to config file", true)
 	ctx.AddFlag(goflag.FlagBool, "verbose", "v", &verbose, "Enable verbose output", false)
 	ctx.AddFlag(goflag.FlagDuration, "timeout", "t", &timeout, "Timeout for the request", false)
 	ctx.AddFlag(goflag.FlagInt, "port", "p", &port, "Port to listen on", false)

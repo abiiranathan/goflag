@@ -138,12 +138,6 @@ func (ctx *Context) AddSubCommand(name, description string, handler func()) *Sub
 // Populates the values of the flags and also finds the matching subcommand.
 // Returns the matching subcommand.
 func (ctx *Context) Parse(argv []string) (*Subcommand, error) {
-	if len(argv) < 2 {
-		return nil, nil
-	}
-
-	// skip the first argument which is the program name.
-	argv = argv[1:]
 	var subcmd *Subcommand = nil
 	subCommandIndex := -1
 
@@ -151,64 +145,78 @@ func (ctx *Context) Parse(argv []string) (*Subcommand, error) {
 	processedGlobalFlags := make(map[string]bool)
 	processedSubCommandFlags := make(map[string]bool)
 
-	// First pass, consume global flags.
-outerloop:
-	for i := 0; i < len(argv); i++ {
-		arg := argv[i]
+	if len(argv) >= 2 {
+		// skip the first argument which is the program name.
+		argv = argv[1:]
 
-		if strings.TrimSpace(arg) == "" {
-			continue
-		}
+		// First pass, consume global flags.
+	outerloop:
+		for i := 0; i < len(argv); i++ {
+			arg := argv[i]
 
-		// Check for = in the arg. If present, split the arg into two.
-		// The first part is the flag name and the second part is the value.
-		// e.g. --name=John
-		if strings.Contains(arg, "=") {
-			parts := strings.Split(arg, "=")       // split the arg into two.
-			arg = parts[0]                         // the first part is the flag name.
-			argv = append(argv[:i+1], argv[i:]...) // insert the second part into the argv.
-			argv[i+1] = parts[1]                   // set the second part as the next arg.
-
-		}
-
-		var name string
-
-		if arg[0] == '-' && arg[1] == '-' {
-			// long flag
-			name = arg[2:]
-		} else if arg[0] == '-' {
-			// short flag
-			name = arg[1:]
-		} else {
-			if len(ctx.subcommands) == 0 {
+			if strings.TrimSpace(arg) == "" {
 				continue
 			}
 
-			// subcommand or flag value.
-			for _, cmd := range ctx.subcommands {
-				if cmd.name == arg {
-					subcmd = cmd
-					subCommandIndex = i
-					break outerloop
-				}
+			// Check for = in the arg. If present, split the arg into two.
+			// The first part is the flag name and the second part is the value.
+			// e.g. --name=John
+			if strings.Contains(arg, "=") {
+				parts := strings.Split(arg, "=")       // split the arg into two.
+				arg = parts[0]                         // the first part is the flag name.
+				argv = append(argv[:i+1], argv[i:]...) // insert the second part into the argv.
+				argv[i+1] = parts[1]                   // set the second part as the next arg.
+
 			}
-			continue // value will be consumed by looking at the next arg.
-		}
 
-		if isHelpFlag(name) {
-			ctx.PrintUsage(os.Stdout)
-			os.Exit(0)
-		}
+			var name string
 
-		flag, err := parseFlags(&ctx.flags, name, i, argv)
-		if err != nil {
-			return nil, err
-		}
+			if arg[0] == '-' && arg[1] == '-' {
+				// long flag
+				name = arg[2:]
+			} else if arg[0] == '-' {
+				// short flag
+				name = arg[1:]
+			} else {
+				if len(ctx.subcommands) == 0 {
+					continue
+				}
 
-		if flag != nil {
-			// Store the processed flag.
-			// This is used to check if all required global flags are present.
-			processedGlobalFlags[flag.Name] = true
+				// subcommand or flag value.
+				for _, cmd := range ctx.subcommands {
+					if cmd.name == arg {
+						subcmd = cmd
+						subCommandIndex = i
+						break outerloop
+					}
+				}
+				continue // value will be consumed by looking at the next arg.
+			}
+
+			if isHelpFlag(name) {
+				ctx.PrintUsage(os.Stdout)
+				os.Exit(0)
+			}
+
+			flag, err := parseFlags(&ctx.flags, name, i, argv)
+			if err != nil {
+				return nil, err
+			}
+
+			if flag != nil {
+				// Store the processed flag.
+				// This is used to check if all required global flags are present.
+				processedGlobalFlags[flag.Name] = true
+			}
+		}
+	}
+
+	// check if all required global flags are present.
+	// Done after parsing the subcommand flags so that the subcommand help can be printed.
+	// if the global flags are missing.
+	for _, flag := range ctx.flags {
+		if _, found := processedGlobalFlags[flag.Name]; !found && flag.Required {
+			return nil, fmt.Errorf("missing required flag %q", flag.Name)
 		}
 	}
 
@@ -266,21 +274,13 @@ outerloop:
 		}
 	}
 
-	// check if all required global flags are present.
-	// Done after parsing the subcommand flags so that the subcommand help can be printed.
-	// if the global flags are missing.
-	for _, flag := range ctx.flags {
-		if _, found := processedGlobalFlags[flag.Name]; !found && flag.Required {
-			return nil, fmt.Errorf("missing required flag %q", flag.Name)
-		}
-	}
-
 	// check if all required subcommand flags are present.
 	for _, flag := range subcmd.flags {
 		if _, found := processedSubCommandFlags[flag.Name]; !found && flag.Required {
 			return nil, fmt.Errorf("missing required flag %q", flag.Name)
 		}
 	}
+
 	return subcmd, nil
 }
 
