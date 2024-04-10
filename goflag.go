@@ -74,20 +74,6 @@ func NewContext() *Context {
 
 // Add a flag to the context.
 func (ctx *Context) AddFlag(flagType FlagType, name, shortName string, valuePtr any, usage string, required bool, validator ...func(any) (bool, string)) *Flag {
-	if name == "" {
-		panic("flag name can't be empty")
-	}
-
-	// check the flag value is a valid pointer.
-	if valuePtr == nil {
-		panic("flag value can't be nil")
-	}
-
-	valueType := reflect.TypeOf(valuePtr)
-	if valueType.Kind() != reflect.Ptr {
-		panic(fmt.Errorf("flag value for %s must be a pointer, got %s", name, valueType.Kind()))
-	}
-
 	flag := &Flag{
 		FlagType:  flagType,
 		Name:      name,
@@ -101,6 +87,14 @@ func (ctx *Context) AddFlag(flagType FlagType, name, shortName string, valuePtr 
 		flag.Validator = validator[0]
 	}
 
+	validateFlag(flag)
+	ctx.flags = append(ctx.flags, flag)
+	return flag
+}
+
+// Add a flag to a subcommand.
+func (ctx *Context) AddFlagPtr(flag *Flag) *Flag {
+	validateFlag(flag)
 	ctx.flags = append(ctx.flags, flag)
 	return flag
 }
@@ -347,9 +341,9 @@ func printFlag(flag *Flag, w io.Writer, longestFlagName int, indent string) {
 	}
 
 	if flag.ShortName != "" {
-		fmt.Fprintf(w, "-%s: %s[default: %v]\n", flag.ShortName, flag.Usage, value)
+		fmt.Fprintf(w, "-%s: %s (default: %s)\n", flag.ShortName, flag.Usage, value)
 	} else {
-		fmt.Fprintf(w, "%s[default: %v]\n", flag.Usage, value)
+		fmt.Fprintf(w, "%s (default: %s)\n", flag.Usage, value)
 	}
 }
 
