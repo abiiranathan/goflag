@@ -11,7 +11,6 @@ import (
 	"io"
 	"log"
 	"os"
-	"path/filepath"
 	"reflect"
 	"strings"
 )
@@ -87,12 +86,6 @@ func New() *CLI {
 	var uninstall bool
 
 	completionCmd = cli.SubCommand("completion", "Generate shell completion scripts", func() {
-		binName := filepath.Base(os.Args[0])
-
-		if shell == "" {
-			log.Fatal("Error: --shell flag is required\n")
-		}
-
 		// Check for conflicting flags
 		if install && uninstall {
 			log.Fatal("Error: cannot use --install and --uninstall together\n")
@@ -100,24 +93,11 @@ func New() *CLI {
 
 		if uninstall {
 			// Uninstall the completion script
-			if err := uninstallCompletion(shell, binName); err != nil {
+			if err := cli.UninstallCompletion(shell); err != nil {
 				log.Fatalf("Failed to uninstall completion: %v\n", err)
 			}
 		} else if install {
-			// Install the completion script
-			var generateFunc func(io.Writer)
-			switch shell {
-			case "bash":
-				generateFunc = cli.GenBashCompletion
-			case "zsh":
-				generateFunc = cli.GenZshCompletion
-			default:
-				log.Fatalf("Unsupported shell: %s\n", shell)
-			}
-
-			if err := installCompletion(shell, binName, generateFunc); err != nil {
-				log.Fatalf("Failed to install completion: %v\n", err)
-			}
+			cli.InstallCompletion(shell)
 		} else {
 			// Just print to stdout
 			switch shell {
@@ -130,7 +110,8 @@ func New() *CLI {
 			}
 		}
 	}).
-		FlagString("shell", "s", &shell, "The shell to generate completions for [bash|zsh]").Required().
+		FlagString("shell", "s", &shell, "The shell to generate completions for [bash|zsh]").
+		Required().Validate(Choices([]string{"zsh", "bash"})).
 		FlagBool("install", "i", &install, "Install the completion script to the appropriate location").
 		FlagBool("uninstall", "u", &uninstall, "Uninstall the completion script")
 
@@ -379,7 +360,7 @@ func parseFlags(flags *[]*Flag, name string, i int, argv []string) (*Flag, error
 		// dereference the pointer to get the value.
 		value := reflect.ValueOf(flag.value).Elem().Interface()
 		if valid, errMsg := flag.validator(value); !valid {
-			return flag, fmt.Errorf("invalid value (%v) for flag [-%s | --%s]: %v", flag.value, flag.shortName, flag.name, errMsg)
+			return flag, fmt.Errorf("invalid value (%v) for flag [--%s]: %v", value, flag.name, errMsg)
 		}
 	}
 	return flag, nil

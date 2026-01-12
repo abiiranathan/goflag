@@ -3,6 +3,7 @@ package goflag
 import (
 	"cmp"
 	"fmt"
+	"slices"
 )
 
 func Choices[T comparable](choices []T) func(v any) (bool, string) {
@@ -11,12 +12,10 @@ func Choices[T comparable](choices []T) func(v any) (bool, string) {
 		if !ok {
 			return false, fmt.Sprintf("Invalid generic type for %v", v)
 		}
-		for _, choice := range choices {
-			if choice == concreteType {
-				return true, ""
-			}
+		if slices.Contains(choices, concreteType) {
+			return true, ""
 		}
-		return false, fmt.Sprintf("%v is not a valid choice. Expected on of %v", v, choices)
+		return false, fmt.Sprintf("Expected value to be one of: %v", choices)
 	}
 }
 

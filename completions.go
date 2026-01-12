@@ -9,6 +9,9 @@ import (
 )
 
 // GenBashCompletion generates a bash completion script and writes it to w.
+// The completion script provides intelligent tab completion for commands, subcommands,
+// and flags. Only long-form flags (--flag) are shown in completions to reduce clutter;
+// short flags can still be used but won't appear in completion suggestions.
 func (c *CLI) GenBashCompletion(w io.Writer) {
 	binName := filepath.Base(os.Args[0])
 
@@ -21,13 +24,10 @@ func (c *CLI) GenBashCompletion(w io.Writer) {
 	fmt.Fprintf(w, "    cur=\"${COMP_WORDS[COMP_CWORD]}\"\n")
 	fmt.Fprintf(w, "    prev=\"${COMP_WORDS[COMP_CWORD-1]}\"\n\n")
 
-	// Collect global flags
+	// Collect global flags (long form only for cleaner completion)
 	var globalFlags []string
 	for _, f := range c.flags {
 		globalFlags = append(globalFlags, "--"+f.name)
-		if f.shortName != "" {
-			globalFlags = append(globalFlags, "-"+f.shortName)
-		}
 	}
 
 	// Collect subcommand names
@@ -39,7 +39,7 @@ func (c *CLI) GenBashCompletion(w io.Writer) {
 	fmt.Fprintf(w, "    subcommands=\"%s\"\n", strings.Join(subCmdNames, " "))
 	fmt.Fprintf(w, "    global_flags=\"%s\"\n\n", strings.Join(globalFlags, " "))
 
-	// Handle flag arguments (Global)
+	// Handle flag arguments (Global) - include both long and short forms for matching
 	fmt.Fprintf(w, "    # Handle flags that need arguments\n")
 	fmt.Fprintf(w, "    case \"$prev\" in\n")
 	for _, f := range c.flags {
@@ -86,7 +86,7 @@ func (c *CLI) GenBashCompletion(w io.Writer) {
 	for _, cmd := range c.subcommands {
 		fmt.Fprintf(w, "        %s)\n", cmd.name)
 
-		// Handle subcommand flags that need arguments
+		// Handle subcommand flags that need arguments - include both long and short forms
 		fmt.Fprintf(w, "            case \"$prev\" in\n")
 		for _, f := range cmd.flags {
 			if f.flagType != FlagBool {
@@ -107,12 +107,10 @@ func (c *CLI) GenBashCompletion(w io.Writer) {
 		}
 		fmt.Fprintf(w, "            esac\n\n")
 
+		// Only show long-form flags in completions
 		var subFlags []string
 		for _, f := range cmd.flags {
 			subFlags = append(subFlags, "--"+f.name)
-			if f.shortName != "" {
-				subFlags = append(subFlags, "-"+f.shortName)
-			}
 		}
 
 		fmt.Fprintf(w, "            local flags=\"%s\"\n", strings.Join(subFlags, " "))
@@ -128,6 +126,12 @@ func (c *CLI) GenBashCompletion(w io.Writer) {
 }
 
 // GenZshCompletion generates a zsh completion script and writes it to w.
+// The completion script provides intelligent tab completion for commands, subcommands,
+// and flags. Only long-form flags (--flag) are shown in completions to reduce clutter;
+// short flags can still be used but won't appear in completion suggestions.
+//
+// The completion will show both subcommands and global flags when pressing tab at the
+// command prompt, making it easy to discover both options.
 // GenZshCompletion generates a zsh completion script and writes it to w.
 func (c *CLI) GenZshCompletion(w io.Writer) {
 	binName := filepath.Base(os.Args[0])
@@ -137,6 +141,7 @@ func (c *CLI) GenZshCompletion(w io.Writer) {
 
 	fmt.Fprintf(w, "_%s() {\n", binName)
 	fmt.Fprintf(w, "    local -a global_opts\n")
+	fmt.Fprintf(w, "    local -a subcommands\n")
 	fmt.Fprintf(w, "    local context state line\n")
 	fmt.Fprintf(w, "    local ret=1\n\n")
 
@@ -160,43 +165,40 @@ func (c *CLI) GenZshCompletion(w io.Writer) {
 			argSpec = ":value:"
 		}
 
-		if f.shortName != "" {
-			fmt.Fprintf(w, "        '(-%s --%s)'{-%s,--%s}'[%s]%s'\n",
-				f.shortName, f.name, f.shortName, f.name, desc, argSpec)
-		} else {
-			fmt.Fprintf(w, "        '--%s[%s]%s'\n", f.name, desc, argSpec)
-		}
+		// Display only long flags
+		fmt.Fprintf(w, "        '--%s[%s]%s'\n", f.name, desc, argSpec)
+
 	}
 	fmt.Fprintf(w, "    )\n\n")
 
-	// Build subcommands array - properly escape for zsh
+	// Define Subcommands
 	if len(c.subcommands) > 0 {
-		fmt.Fprintf(w, "    local -a subcommands\n")
 		fmt.Fprintf(w, "    subcommands=(\n")
 		for _, cmd := range c.subcommands {
-			// Properly escape the description for zsh
-			// Single quotes in zsh arrays need special handling
-			desc := strings.ReplaceAll(cmd.description, "'", "'\"'\"'")
+			// Escape descriptions for Zsh string
+			desc := strings.ReplaceAll(cmd.description, "'", "'\\''")
+			// Zsh _arguments (( )) syntax expects 'name:description'
 			fmt.Fprintf(w, "        '%s:%s'\n", cmd.name, desc)
 		}
 		fmt.Fprintf(w, "    )\n\n")
 	}
 
 	// Main _arguments call
+	// We pass global_opts as normal arguments.
+	// We pass subcommands specifically to the first positional argument.
+	// Zsh automatically handles the "Flag OR Subcommand" logic here.
 	fmt.Fprintf(w, "    _arguments -C \\\n")
 	fmt.Fprintf(w, "        \"${global_opts[@]}\" \\\n")
 	if len(c.subcommands) > 0 {
-		fmt.Fprintf(w, "        '1:command:->command' \\\n")
+		// The (( )) syntax tells _arguments to use the subcommands array for completion items
+		fmt.Fprintf(w, "        '1:command:((${subcommands}))' \\\n")
 		fmt.Fprintf(w, "        '*::arg:->args' \\\n")
 	}
 	fmt.Fprintf(w, "        && ret=0\n\n")
 
-	// State machine for subcommands
+	// State machine for subcommand-specific flags
 	if len(c.subcommands) > 0 {
 		fmt.Fprintf(w, "    case $state in\n")
-		fmt.Fprintf(w, "        command)\n")
-		fmt.Fprintf(w, "            _describe 'command' subcommands && ret=0\n")
-		fmt.Fprintf(w, "            ;;\n")
 		fmt.Fprintf(w, "        args)\n")
 		fmt.Fprintf(w, "            case $line[1] in\n")
 
@@ -219,12 +221,9 @@ func (c *CLI) GenZshCompletion(w io.Writer) {
 					argSpec = ":value:"
 				}
 
-				if f.shortName != "" {
-					fmt.Fprintf(w, "                        '(-%s --%s)'{-%s,--%s}'[%s]%s' \\\n",
-						f.shortName, f.name, f.shortName, f.name, desc, argSpec)
-				} else {
-					fmt.Fprintf(w, "                        '--%s[%s]%s' \\\n", f.name, desc, argSpec)
-				}
+				// Show only long flags
+				fmt.Fprintf(w, "                        '--%s[%s]%s' \\\n", f.name, desc, argSpec)
+
 			}
 			fmt.Fprintf(w, "                        && ret=0\n")
 			fmt.Fprintf(w, "                    ;;\n")
@@ -240,6 +239,71 @@ func (c *CLI) GenZshCompletion(w io.Writer) {
 	fmt.Fprintf(w, "_%s \"$@\"\n", binName)
 }
 
+// InstallCompletion installs shell completion scripts for the CLI application.
+// This function automatically detects the user's shell (bash or zsh) and installs
+// the appropriate completion script to the user's home directory.
+//
+// For bash, the completion script is installed to ~/.bash_completion.d/<binName>
+// and a source line is added to ~/.bashrc if not already present.
+//
+// For zsh, the completion script is installed to ~/.zsh/completion/_<binName>
+// and the necessary fpath and compinit lines are added to ~/.zshrc if not already present.
+//
+// Parameters:
+//   - shell: The shell to install completions for ("bash" or "zsh")
+//
+// Returns an error if installation fails.
+//
+// Example:
+//
+//	cli := goflag.NewCLI()
+//	if err := cli.InstallCompletion("bash"); err != nil {
+//	    fmt.Fprintf(os.Stderr, "Failed to install completion: %v\n", err)
+//	}
+func (c *CLI) InstallCompletion(shell string) error {
+	binName := filepath.Base(os.Args[0])
+
+	var generateFunc func(io.Writer)
+	switch shell {
+	case "bash":
+		generateFunc = c.GenBashCompletion
+	case "zsh":
+		generateFunc = c.GenZshCompletion
+	default:
+		return fmt.Errorf("unsupported shell: %s (supported: bash, zsh)", shell)
+	}
+
+	return installCompletion(shell, binName, generateFunc)
+}
+
+// UninstallCompletion removes shell completion scripts for the CLI application.
+// This function removes the completion script from the user's home directory and
+// cleans up any references to it in shell configuration files.
+//
+// For bash, the completion script is removed from ~/.bash_completion.d/<binName>
+// and the source line is removed from ~/.bashrc.
+//
+// For zsh, the completion script is removed from ~/.zsh/completion/_<binName>.
+// Note that fpath and compinit lines remain in ~/.zshrc as they may be used by
+// other completions.
+//
+// Parameters:
+//   - shell: The shell to uninstall completions for ("bash" or "zsh")
+//
+// Returns an error if uninstallation fails.
+//
+// Example:
+//
+//	cli := goflag.NewCLI()
+//	if err := cli.UninstallCompletion("bash"); err != nil {
+//	    fmt.Fprintf(os.Stderr, "Failed to uninstall completion: %v\n", err)
+//	}
+func (c *CLI) UninstallCompletion(shell string) error {
+	binName := filepath.Base(os.Args[0])
+	return uninstallCompletion(shell, binName)
+}
+
+// installCompletion installs the completion script to the appropriate location
 // installCompletion installs the completion script to the appropriate location
 func installCompletion(shell, binName string, generateFunc func(io.Writer)) error {
 	var installPath string
@@ -272,7 +336,8 @@ func installCompletion(shell, binName string, generateFunc func(io.Writer)) erro
 		bashrcPath := filepath.Join(homeDir, ".bashrc")
 		sourceLine := fmt.Sprintf("source %s", installPath)
 
-		if err := addSourceLineIfMissing(bashrcPath, sourceLine, installPath); err != nil {
+		// Check for the specific source line
+		if err := addSourceLineIfMissing(bashrcPath, sourceLine, sourceLine); err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: Could not update .bashrc: %v\n", err)
 			fmt.Fprintf(os.Stderr, "Add this line to your .bashrc manually:\n  %s\n", sourceLine)
 		}
@@ -301,10 +366,14 @@ func installCompletion(shell, binName string, generateFunc func(io.Writer)) erro
 
 		// Add fpath and compinit to .zshrc if not already present
 		zshrcPath := filepath.Join(homeDir, ".zshrc")
-		fpathLine := "fpath=(~/.zsh/completion $fpath)"
+
+		// FIX: Use the literal string "~/.zsh/completion" for the check,
+		// NOT the absolute path variable 'completionDir'
+		fpathStr := "~/.zsh/completion"
+		fpathLine := fmt.Sprintf("fpath=(%s $fpath)", fpathStr)
 		compinitLine := "autoload -Uz compinit && compinit"
 
-		if err := addSourceLineIfMissing(zshrcPath, fpathLine, completionDir); err != nil {
+		if err := addSourceLineIfMissing(zshrcPath, fpathLine, fpathStr); err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: Could not update .zshrc: %v\n", err)
 		}
 		if err := addSourceLineIfMissing(zshrcPath, compinitLine, "compinit"); err != nil {
@@ -321,7 +390,7 @@ func installCompletion(shell, binName string, generateFunc func(io.Writer)) erro
 	return nil
 }
 
-// addSourceLineIfMissing adds a line to a shell rc file if it's not already present
+// addSourceLineIfMissing adds a line to the beginning of a shell rc file if it's not already present
 func addSourceLineIfMissing(rcPath, line, checkStr string) error {
 	// Read existing content
 	content, err := os.ReadFile(rcPath)
@@ -338,15 +407,9 @@ func addSourceLineIfMissing(rcPath, line, checkStr string) error {
 		return nil // Already present
 	}
 
-	// Append the line
-	f, err := os.OpenFile(rcPath, os.O_APPEND|os.O_WRONLY, 0644)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	_, err = f.WriteString("\n" + line + "\n")
-	return err
+	// Prepend the line (add to beginning)
+	newContent := line + "\n" + string(content)
+	return os.WriteFile(rcPath, []byte(newContent), 0644)
 }
 
 // uninstallCompletion removes the completion script and cleans up rc files
