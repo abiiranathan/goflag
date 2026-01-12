@@ -8,14 +8,14 @@ import (
 )
 
 func TestParse(t *testing.T) {
-	ctx := New()
+	cli := New()
 	var (
 		name   string = "World"
 		age    int    = 20
 		height int    = 0
 	)
 
-	ctx.subcommands = []*subcommand{
+	cli.subcommands = []*subcommand{
 		{
 			name:        "test",
 			description: "Test command",
@@ -94,7 +94,7 @@ func TestParse(t *testing.T) {
 		"--height", "100",
 	}
 
-	s1, err := ctx.Parse(argv1)
+	s1, err := cli.Parse(argv1)
 	if err != nil {
 		t.Fatal("Expected no error: ", err)
 	}
@@ -123,7 +123,7 @@ func TestParse(t *testing.T) {
 		"--height", "0",
 	}
 
-	s2, err := ctx.Parse(argv2)
+	s2, err := cli.Parse(argv2)
 	if err == nil {
 		t.Fatalf("Expected error, but got nil\n")
 	}
@@ -133,49 +133,49 @@ func TestParse(t *testing.T) {
 	}
 
 	// check the flag values
-	if ctx.subcommands[0].flags[0].value.(string) != "John" {
-		t.Errorf("Expected name flag value to be 'John', but got '%v'", ctx.subcommands[0].flags[0].value)
+	if cli.subcommands[0].flags[0].value.(string) != "John" {
+		t.Errorf("Expected name flag value to be 'John', but got '%v'", cli.subcommands[0].flags[0].value)
 	}
 
-	if ctx.subcommands[1].flags[0].value.(int) != 30 {
-		t.Errorf("Expected age flag value to be 30, but got '%v'", ctx.subcommands[1].flags[0].value)
+	if cli.subcommands[1].flags[0].value.(int) != 30 {
+		t.Errorf("Expected age flag value to be 30, but got '%v'", cli.subcommands[1].flags[0].value)
 	}
 
 }
 
 func TestAddCommand(t *testing.T) {
-	ctx := New()
+	cli := New()
 	var name string
-	ctx.SubCommand("test", "Test command", func() {
+	cli.SubCommand("test", "Test command", func() {
 		fmt.Println("Test command")
 	}).Flag(FlagString, "name", "n", &name, "Your name").Required()
 
-	// ctx.subCommands[0] is completions automatically inserted with NewContext.
+	// cli.subCommands[0] is completions automatically inserted with NewContext.
 	// subcommand[0].flags[0] is the --help flag auto inserted by .AddFlag.
-	if len(ctx.subcommands) != 1 {
-		t.Errorf("Expected 2 subcommand, but got %v", len(ctx.subcommands))
+	if len(cli.subcommands) != 1 {
+		t.Errorf("Expected 2 subcommand, but got %v", len(cli.subcommands))
 	}
 
-	if ctx.subcommands[0].name != "test" {
-		t.Errorf("Expected subcommand name to be 'test', but got '%v'", ctx.subcommands[0].name)
+	if cli.subcommands[0].name != "test" {
+		t.Errorf("Expected subcommand name to be 'test', but got '%v'", cli.subcommands[0].name)
 	}
 
-	if ctx.subcommands[0].description != "Test command" {
-		t.Errorf("Expected subcommand usage to be 'Test command', but got '%v'", ctx.subcommands[0].description)
+	if cli.subcommands[0].description != "Test command" {
+		t.Errorf("Expected subcommand usage to be 'Test command', but got '%v'", cli.subcommands[0].description)
 	}
 
-	if len(ctx.subcommands[0].flags) != 2 {
-		t.Errorf("Expected 2 flags, but got %v", len(ctx.subcommands[0].flags))
+	if len(cli.subcommands[0].flags) != 2 {
+		t.Errorf("Expected 2 flags, but got %v", len(cli.subcommands[0].flags))
 	}
 
-	if ctx.subcommands[0].flags[1].name != "name" {
-		t.Errorf("Expected flag name to be 'name', but got '%v'", ctx.subcommands[1].flags[1].name)
+	if cli.subcommands[0].flags[1].name != "name" {
+		t.Errorf("Expected flag name to be 'name', but got '%v'", cli.subcommands[1].flags[1].name)
 	}
 }
 
 func TestPrintUsage(t *testing.T) {
 	// Set up test data
-	ctx := &CLI{
+	cli := &CLI{
 		flags: []*Flag{
 			{
 				name:  "help",
@@ -233,7 +233,7 @@ func TestPrintUsage(t *testing.T) {
 
 	// Capture output
 	var buf bytes.Buffer
-	ctx.PrintUsage(&buf)
+	cli.PrintUsage(&buf)
 
 	// Check output
 	expectedInOutput := []string{
@@ -264,32 +264,32 @@ func TestPrintUsage(t *testing.T) {
 }
 
 func TestAddFlag(t *testing.T) {
-	ctx := New()
+	cli := New()
 	var name string
 
-	ctx.Flag(FlagString, "name", "n", &name, "Your name").Required()
+	cli.Flag(FlagString, "name", "n", &name, "Your name").Required()
 
-	if len(ctx.flags) != 2 {
-		t.Errorf("Expected 2 flags, but got %v", len(ctx.flags))
+	if len(cli.flags) != 2 {
+		t.Errorf("Expected 2 flags, but got %v", len(cli.flags))
 	}
 
-	if ctx.flags[1].name != "name" {
-		t.Errorf("Expected flag name to be 'name', but got '%v'", ctx.flags[1].name)
+	if cli.flags[1].name != "name" {
+		t.Errorf("Expected flag name to be 'name', but got '%v'", cli.flags[1].name)
 	}
 
-	if ctx.flags[1].shortName != "n" {
-		t.Errorf("Expected flag short name to be 'n', but got '%v'", ctx.flags[1].shortName)
+	if cli.flags[1].shortName != "n" {
+		t.Errorf("Expected flag short name to be 'n', but got '%v'", cli.flags[1].shortName)
 	}
 }
 
 func TestGlobalRequiredFlags(t *testing.T) {
 	// test global required flag
-	ctx := New()
+	cli := New()
 
 	var verbose bool
 	var port int
 
-	ctx.flags = []*Flag{
+	cli.flags = []*Flag{
 		{
 			name:      "verbose",
 			flagType:  FlagBool,
@@ -315,7 +315,7 @@ func TestGlobalRequiredFlags(t *testing.T) {
 		"--port", "8080",
 	}
 
-	if _, err := ctx.Parse(argv1); err != nil {
+	if _, err := cli.Parse(argv1); err != nil {
 		t.Fatalf("Expected no error, but got '%v'", err)
 	}
 

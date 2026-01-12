@@ -1,223 +1,318 @@
 # goflag
 
-[![GoDoc](https://godoc.org/github.com/bradleyjkemp/goflag?status.svg)](https://godoc.org/github.com/bradleyjkemp/goflag)
+A simple, type-safe command-line flag parsing library for Go with support for subcommands.
 
-A simple library for parsing command line arguments. It is designed to be a drop-in replacement for the standard library's `flag` package.
+## Features
 
-The main difference is that `goflag`
-
-- supports both short and long flags
-- requires no global state
-- has a beatiful API based on the builder pattern that allows you to define your subcommands and flags in a single expression
-- supports subcommands. Subcommands can have their own flags. However, subcommands cannot have subcommands of their own (yet).
-- Beautifully formatted help text, with support for subcommand help text too.
-- Supports custom validation of flags and arguments.
-- Supports custom flag types with -, -- and = syntax.
+- Type-safe flag parsing with dedicated methods for common types
+- Support for subcommands with their own flags
+- Required flags validation and custom validators for each flag.
+- Method chaining for cleaner API
+- Rich set of built-in types (strings, numbers, durations, URLs, IPs, emails, etc.)
+- Automatic help generation
+- Bash and zsh completions
 
 ## Installation
-
 ```bash
-go get -u github.com/abiiranathan/goflag
+go get github.com/abiiranathan/goflag
 ```
 
-## Usage
-
+## Quick Start
 ```go
-
 package main
 
 import (
-	"fmt"
-	"log"
-	"net"
-	"net/url"
-	"os"
-	"time"
-
-	"github.com/abiiranathan/goflag"
-	"github.com/google/uuid"
+    "fmt"
+    "log"
+    "os"
+    "time"
+    
+    "github.com/abiiranathan/goflag"
 )
 
+func main() {
+    var (
+        config  string
+        verbose bool
+        timeout time.Duration
+        port    int
+    )
+    
+    cli := goflag.New()
+    
+    // Define flags using helper methods
+    cli.String("config", "c", &config, "Path to config file").Required()
+    cli.Bool("verbose", "v", &verbose, "Enable verbose output")
+    cli.Duration("timeout", "t", &timeout, "Request timeout")
+    cli.Int("port", "p", &port, "Port to listen on")
+    
+    // Parse arguments
+    subcmd, err := cli.Parse(os.Args)
+    if err != nil {
+        log.Fatal(err)
+    }
+    
+    fmt.Printf("Config: %s\n", config)
+    fmt.Printf("Verbose: %v\n", verbose)
+    fmt.Printf("Timeout: %v\n", timeout)
+    fmt.Printf("Port: %d\n", port)
+
+	if subcmd != nil{
+		subcmd.Handler()
+	}
+}
+```
+
+## Subcommands
+
+Create subcommands with their own flags:
+```go
 var (
-	name     string = "World"
-	greeting string = "Hello"
-	short    bool
-
-	urlValue url.URL
-	uuidVal  uuid.UUID
-	ipVal    net.IP
-	macVal   net.HardwareAddr
-	emailVal string
-	hpVal    string
-	fileVal  string
-	dirVal   string
-
-	origins       []string = []string{"*"}
-	methods       []string = []string{"GET", "POST"}
-	headers       []string = []string{"Content-Type"}
-	credentials   bool
-	verbose       bool
-	config        string        = "config.json"
-	port          int           = 8080
-	start         time.Time     = time.Now()
-	timeout       time.Duration = 5 * time.Second
-	durationValue               = 5
-
-	upperValue bool
+    name     string = "World"
+    greeting string = "Hello"
+    upper    bool
 )
 
 func greetUser() {
-	fmt.Println(greeting, name)
-}
-
-func printVersion() {
-	if short {
-		fmt.Println("1.0.0")
-	} else {
-		fmt.Println("1.0.0")
-		fmt.Println("Build Date: 2021-01-01")
-		fmt.Println("Commit: 1234567890")
-	}
-}
-
-func handleSleep() {
-	time.Sleep(time.Duration(durationValue) * time.Second)
-}
-
-func handleCors() {
-	fmt.Println("Origins: ", origins)
-	fmt.Println("Methods: ", methods)
-	fmt.Println("Headers: ", headers)
-	fmt.Println("Credentials: ", credentials)
+    message := fmt.Sprintf("%s, %s!", greeting, name)
+    if upper {
+        message = strings.ToUpper(message)
+    }
+    fmt.Println(message)
 }
 
 func main() {
-	log.SetFlags(log.Lshortfile)
-	ctx := goflag.NewContext()
-
-	ctx.AddFlag(goflag.FlagString, "config", "c", &config, "Path to config file", false)
-	ctx.AddFlag(goflag.FlagBool, "verbose", "v", &verbose, "Enable verbose output", false)
-	ctx.AddFlag(goflag.FlagDuration, "timeout", "t", &timeout, "Timeout for the request", false)
-	ctx.AddFlag(goflag.FlagInt, "port", "p", &port, "Port to listen on", false)
-	ctx.AddFlag(goflag.FlagString, "hostport", "h", &hpVal, "Host:Port to listen on", false)
-	ctx.AddFlag(goflag.FlagTime, "start", "s", &start, "Start time", false)
-	ctx.AddFlag(goflag.FlagURL, "url", "u", &urlValue, "URL to fetch", false)
-	ctx.AddFlag(goflag.FlagUUID, "uuid", "i", &uuidVal, "UUID to use", false)
-	ctx.AddFlag(goflag.FlagIP, "ip", "i", &ipVal, "IP to use", false)
-	ctx.AddFlag(goflag.FlagMAC, "mac", "m", &macVal, "MAC address to use", false)
-	ctx.AddFlag(goflag.FlagEmail, "email", "e", &emailVal, "Email address to use", false)
-	ctx.AddFlag(goflag.FlagFilePath, "file", "f", &fileVal, "File path to use", false)
-	ctx.AddFlag(goflag.FlagDirPath, "dir", "d", &dirVal, "Directory path to use", false)
-
-	ctx.AddSubCommand("greet", "Greet a person", greetUser).
-		AddFlag(goflag.FlagString, "name", "n", &name, "Name of the person to greet", true).
-		AddFlag(goflag.FlagString, "greeting", "g", &greeting, "Greeting to use", false).
-		AddFlag(goflag.FlagBool, "upper", "u", &upperValue, "Print in upper case", false)
-
-	ctx.AddSubCommand("version", "Print version", printVersion).
-		AddFlag(goflag.FlagBool, "verbose", "v", &verbose, "Enable verbose output", false).
-		AddFlag(goflag.FlagBool, "short", "s", &short, "Print short version", false)
-
-	ctx.AddSubCommand("sleep", "Sleep for a while", handleSleep).
-		AddFlag(goflag.FlagInt, "time", "t", &durationValue, "Time to sleep in seconds", true)
-
-	ctx.AddSubCommand("cors", "Enable CORS", handleCors).
-		AddFlag(goflag.FlagStringSlice, "origins", "o", &origins, "Allowed origins", true).
-		AddFlag(goflag.FlagStringSlice, "methods", "m", &methods, "Allowed methods", true).
-		AddFlag(goflag.FlagStringSlice, "headers", "d", &headers, "Allowed headers", true).
-		AddFlag(goflag.FlagBool, "credentials", "c", &credentials, "Allow credentials", false)
-
-	// Parse the command line arguments and return the matching subcommand
-	subcmd, err := ctx.Parse(os.Args)
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	if subcmd != nil {
-		subcmd.Handler()
-	}
-
-	// Print the values
-	fmt.Println("Config: ", config)
-	fmt.Println("Verbose: ", verbose)
-	fmt.Println("Timeout: ", timeout)
-	fmt.Println("Port: ", port)
-	fmt.Println("Start: ", start)
-
-	fmt.Println("URL: ", urlValue)
-	fmt.Println("UUID: ", uuidVal)
-	fmt.Println("IP: ", ipVal)
-	fmt.Println("MAC: ", macVal)
-	fmt.Println("Email: ", emailVal)
-	fmt.Println("HostPort: ", hpVal)
-	fmt.Println("File: ", fileVal)
-	fmt.Println("Dir: ", dirVal)
-
-	fmt.Println("Origins: ", origins)
-	fmt.Println("Methods: ", methods)
-	fmt.Println("Headers: ", headers)
-	fmt.Println("Credentials: ", credentials)
-
-	fmt.Println("Name: ", name)
-	fmt.Println("Greeting: ", greeting)
-	fmt.Println("Short: ", short)
-	fmt.Println("Duration: ", durationValue)
-
+    cli := goflag.New()
+    
+    // Define a subcommand with flags
+    cli.SubCommand("greet", "Greet a person", greetUser).
+        String("name", "n", &name, "Name of the person to greet").Required().
+        String("greeting", "g", &greeting, "Greeting to use").
+        Bool("upper", "u", &upper, "Print in upper case")
+    
+    subcmd, err := cli.Parse(os.Args)
+    if err != nil {
+        log.Fatal(err)
+    }
+    
+    if subcmd != nil {
+        subcmd.Handler()
+        os.Exit(0)
+    }
 }
-
-
 ```
 
----
-
-## Accessing flags values.
-
-Note that ctx.Parse() returns the matching subcommand. If no subcommand is matched, it returns nil.
-The subcommand handler should be called with the context and the subcommand as arguments.
-
-The handler can then access the flags and arguments using the `Get` or `GetString`, `GetBool` etc methods on either the context or the subcommand.
-
-> The context carries the global flags and the subcommand carries the subcommand specific flags.
-
-Supported flag types are
-
-- [x] `string`
-- [x] `bool`
-- [x] `int`
-- [x] `int64`
-- [x] `float64`
-- [x] `float32`
-- [x] `time.Duration` with format `1h2m3s`, `1h`, `1h2m`, `1m2s`, `1m`, `1s` as supported by the standard library's `time.ParseDuration` function.
-- [x] `time.Time` with format `2006-01-02T15:04 MST`
-- [x] `rune`
-- [x] `[]string` (comma separated list of strings) with format `a,b,c,d`
-- [x] `[]int` (comma separated list of ints) with format `1,2,3,4`
-- [x] `ip` (IP address) with format `xxx.xxx.xxx.xxx`
-- [x] `mac` (MAC address) with format `xx:xx:xx:xx:xx:xx`
-- [x] `hostport` (IP address with port) pair with format `host:port`
-- [x] `path` (file path) with format. Will be converted to be an absolute path and will be validated to exist.
-- [x] `url` with format `scheme://host:port/path?query#fragment`
-- [x] `email` with format `local@domain`. Validated using the standard library's `mail.ParseAddress` function.
-- [x] `uuid` with format `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` (UUID v4 with [Google's UUID package](http://github.com/google/uuid))
-
-See [Example](./cmd/examples/example.go) for more details.
-Run the example with `./test.sh` to see the output.
-
-### Preview of the help text
-
+Usage:
 ```bash
-Usage: ./cli --help
+$ myapp greet --name John --upper
+HELLO, JOHN!
+
+$ myapp greet -n Alice -g "Good morning"
+Good morning, Alice!
 ```
 
-## Contributing
+## Supported Flag Types
 
-Contributions are welcome. Please open an issue to discuss your ideas before opening a PR.
+### Basic Types
+```go
+cli.String("name", "n", &str, "String value")
+cli.Int("count", "c", &num, "Integer value")
+cli.Int64("big", "b", &big, "64-bit integer")
+cli.Float32("ratio", "r", &f32, "32-bit float")
+cli.Float64("pi", "p", &f64, "64-bit float")
+cli.Bool("verbose", "v", &verbose, "Boolean flag")
+cli.Rune("char", "c", &char, "Single character")
+```
 
-### License
+### Time Types
+```go
+cli.Duration("timeout", "t", &duration, "Duration (e.g., 5s, 2m)")
+cli.Time("start", "s", &start, "Timestamp")
+```
 
-MIT
+### Slice Types
+```go
+cli.StringSlice("origins", "o", &origins, "Allowed origins")
+cli.IntSlice("ports", "p", &ports, "Port numbers")
+```
 
-## TODO
+### Network Types
+```go
+cli.IP("address", "a", &ip, "IP address")
+cli.MAC("mac", "m", &mac, "MAC address")
+cli.URL("endpoint", "e", &url, "URL")
+cli.HostPortPair("listen", "l", &hostport, "Host:port pair")
+```
 
-- [ ] Add support for subcommands of subcommands.
-- [ ] Implement more tests
+### Special Types
+```go
+cli.Email("contact", "c", &email, "Email address")
+cli.UUID("id", "i", &uuid, "UUID")
+cli.FilePath("input", "i", &file, "Input file path")
+cli.DirPath("output", "o", &dir, "Output directory")
+```
+
+## Required Flags
+
+Mark flags as required using the `.Required()` method:
+```go
+cli.String("config", "c", &config, "Config file").Required()
+cli.Int("port", "p", &port, "Server port").Required()
+```
+
+## Complete Example
+```go
+package main
+
+import (
+    "fmt"
+    "log"
+    "net"
+    "net/url"
+    "os"
+    "time"
+    
+    "github.com/abiiranathan/goflag"
+    "github.com/google/uuid"
+)
+
+var (
+    config    string
+    verbose   bool
+    port      int
+    timeout   time.Duration
+    start     time.Time
+    urlValue  url.URL
+    uuidVal   uuid.UUID
+    ipVal     net.IP
+    macVal    net.HardwareAddr
+    emailVal  string
+    fileVal   string
+    dirVal    string
+    origins   []string
+    methods   []string
+)
+
+func main() {
+    log.SetFlags(log.Lshortfile)
+    cli := goflag.New()
+    
+    // Global flags
+    cli.String("config", "c", &config, "Path to config file").Required()
+    cli.Bool("verbose", "v", &verbose, "Enable verbose output")
+    cli.Duration("timeout", "t", &timeout, "Request timeout")
+    cli.Int("port", "p", &port, "Port to listen on")
+    cli.Time("start", "s", &start, "Start time")
+    cli.URL("url", "u", &urlValue, "URL to fetch")
+    cli.UUID("uuid", "i", &uuidVal, "UUID to use")
+    cli.IP("ip", "", &ipVal, "IP address")
+    cli.MAC("mac", "m", &macVal, "MAC address")
+    cli.Email("email", "e", &emailVal, "Email address")
+    cli.FilePath("file", "f", &fileVal, "File path")
+    cli.DirPath("dir", "d", &dirVal, "Directory path")
+    cli.StringSlice("origins", "o", &origins, "Allowed origins")
+    cli.StringSlice("methods", "", &methods, "HTTP methods")
+    
+    // Subcommands
+    cli.SubCommand("serve", "Start the server", startServer).
+        Int("workers", "w", &workers, "Number of workers").Required()
+    
+    cli.SubCommand("version", "Print version", printVersion).
+        Bool("short", "s", &short, "Short version format")
+    
+    // Parse
+    subcmd, err := cli.Parse(os.Args)
+    if err != nil {
+        log.Fatal(err)
+    }
+    
+    if subcmd != nil {
+        subcmd.Handler()
+        os.Exit(0)
+    }
+    
+    // Main program logic when no subcommand is provided
+    fmt.Printf("Config: %s\n", config)
+    fmt.Printf("Verbose: %v\n", verbose)
+    fmt.Printf("Port: %d\n", port)
+}
+```
+
+## Method Chaining
+
+Both global flags and subcommand flags support method chaining:
+```go
+// Global flags
+cli.String("config", "c", &config, "Config file").Required()
+
+// Subcommand flags
+cli.SubCommand("deploy", "Deploy application", deployApp).
+    String("env", "e", &env, "Environment").Required().
+    Bool("dry-run", "d", &dryRun, "Dry run mode").
+    StringSlice("tags", "t", &tags, "Deployment tags")
+```
+
+## Usage Examples
+```bash
+# Using long flags
+$ myapp --config app.json --verbose --port 8080
+
+# Using short flags
+$ myapp -c app.json -v -p 8080
+
+# Using subcommands
+$ myapp greet --name Alice
+
+# slice flags
+$ myapp --origins http://localhost:3000,http://localhost:8080
+
+# Help
+$ myapp --help
+$ myapp greet --help
+```
+
+## API Reference
+
+### CLI Methods
+
+- `New() *CLI` - Create a new CLI instance
+- `Parse(args []string) (*Subcommand, error)` - Parse command-line arguments
+- `SubCommand(name, description string, handler func()) *Subcommand` - Add a subcommand
+
+### Flag Definition Methods
+
+All methods follow the pattern: `Type(name, shortName string, valuePtr any, usage string) *Flag`
+
+Available on both `*CLI` and `*Subcommand`:
+
+- `String()` - String flag
+- `Int()` - Integer flag  
+- `Int64()` - 64-bit integer flag
+- `Float32()` - 32-bit float flag
+- `Float64()` - 64-bit float flag
+- `Bool()` - Boolean flag
+- `Rune()` - Single character flag
+- `Duration()` - time.Duration flag
+- `Time()` - time.Time flag
+- `StringSlice()` - String slice flag
+- `IntSlice()` - Integer slice flag
+- `IP()` - IP address flag
+- `MAC()` - MAC address flag
+- `URL()` - URL flag
+- `UUID()` - UUID flag
+- `HostPortPair()` - Host:port pair flag
+- `Email()` - Email address flag
+- `FilePath()` - File path flag
+- `DirPath()` - Directory path flag
+
+### Flag Methods
+
+- `Required()` - Mark flag as required
+
+### Subcommand Methods
+
+- `Handler()` - Execute the subcommand handler
+
+## License
+
+MIT License
