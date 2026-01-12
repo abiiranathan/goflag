@@ -110,11 +110,10 @@ func New() *CLI {
 			}
 		}
 	}).
-		FlagString("shell", "s", &shell, "The shell to generate completions for [bash|zsh]").
+		String("shell", "s", &shell, "The shell to generate completions for [bash|zsh]").
 		Required().Validate(Choices([]string{"zsh", "bash"})).
-		FlagBool("install", "i", &install, "Install the completion script to the appropriate location").
-		FlagBool("uninstall", "u", &uninstall, "Uninstall the completion script")
-
+		Bool("install", "i", &install, "Install the completion script to the appropriate location").
+		Bool("uninstall", "u", &uninstall, "Uninstall the completion script")
 	return cli
 }
 
