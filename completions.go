@@ -43,7 +43,7 @@ func (c *CLI) GenBashCompletion(w io.Writer) {
 	fmt.Fprintf(w, "    # Handle flags that need arguments\n")
 	fmt.Fprintf(w, "    case \"$prev\" in\n")
 	for _, f := range c.flags {
-		if f.flagType != FlagBool {
+		if f.flagType != flagBool {
 			flags := []string{"--" + f.name}
 			if f.shortName != "" {
 				flags = append(flags, "-"+f.shortName)
@@ -51,9 +51,9 @@ func (c *CLI) GenBashCompletion(w io.Writer) {
 			fmt.Fprintf(w, "        %s)\n", strings.Join(flags, "|"))
 			// Suggest files or directories if the flag type matches
 			switch f.flagType {
-			case FlagDirPath:
+			case flagDirPath:
 				fmt.Fprintf(w, "            COMPREPLY=( $(compgen -d -- \"$cur\") )\n")
-			case FlagFilePath:
+			case flagFilePath:
 				fmt.Fprintf(w, "            COMPREPLY=( $(compgen -f -- \"$cur\") )\n")
 			}
 			fmt.Fprintf(w, "            return 0\n")
@@ -89,16 +89,16 @@ func (c *CLI) GenBashCompletion(w io.Writer) {
 		// Handle subcommand flags that need arguments - include both long and short forms
 		fmt.Fprintf(w, "            case \"$prev\" in\n")
 		for _, f := range cmd.flags {
-			if f.flagType != FlagBool {
+			if f.flagType != flagBool {
 				flags := []string{"--" + f.name}
 				if f.shortName != "" {
 					flags = append(flags, "-"+f.shortName)
 				}
 				fmt.Fprintf(w, "                %s)\n", strings.Join(flags, "|"))
 				switch f.flagType {
-				case FlagDirPath:
+				case flagDirPath:
 					fmt.Fprintf(w, "                    COMPREPLY=( $(compgen -d -- \"$cur\") )\n")
-				case FlagFilePath:
+				case flagFilePath:
 					fmt.Fprintf(w, "                    COMPREPLY=( $(compgen -f -- \"$cur\") )\n")
 				}
 				fmt.Fprintf(w, "                    return 0\n")
@@ -155,11 +155,11 @@ func (c *CLI) GenZshCompletion(w io.Writer) {
 		// Determine argument specification
 		argSpec := ""
 		switch f.flagType {
-		case FlagBool:
+		case flagBool:
 			argSpec = ""
-		case FlagDirPath:
+		case flagDirPath:
 			argSpec = ":dir:_files -/"
-		case FlagFilePath:
+		case flagFilePath:
 			argSpec = ":file:_files"
 		default:
 			argSpec = ":value:"
@@ -211,11 +211,11 @@ func (c *CLI) GenZshCompletion(w io.Writer) {
 
 				argSpec := ""
 				switch f.flagType {
-				case FlagBool:
+				case flagBool:
 					argSpec = ""
-				case FlagDirPath:
+				case flagDirPath:
 					argSpec = ":dir:_files -/"
-				case FlagFilePath:
+				case flagFilePath:
 					argSpec = ":file:_files"
 				default:
 					argSpec = ":value:"

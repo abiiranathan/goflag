@@ -15,9 +15,9 @@ type subcommand struct {
 }
 
 // Add validator to last flag in the subcommand chain.
-func (cmd *subcommand) Validate(validator func(any) (bool, string)) *subcommand {
+func (cmd *subcommand) Validate(validators ...FlagValidator) *subcommand {
 	if len(cmd.flags) > 0 {
-		cmd.flags[len(cmd.flags)-1].validator = validator
+		cmd.flags[len(cmd.flags)-1].validators = append(cmd.flags[len(cmd.flags)-1].validators, validators...)
 	}
 	return cmd
 }
@@ -30,13 +30,14 @@ func (cmd *subcommand) Required() *subcommand {
 }
 
 // Add a flag to a subcommand.
-func (cmd *subcommand) Flag(flagType FlagType, name, shortName string, valuePtr any, usage string) *subcommand {
+func (cmd *subcommand) Flag(flagType flagType, name, shortName string, valuePtr any, usage string) *subcommand {
 	flag := &Flag{
-		flagType:  flagType,
-		name:      name,
-		shortName: shortName,
-		value:     valuePtr,
-		usage:     usage,
+		flagType:   flagType,
+		name:       name,
+		shortName:  shortName,
+		value:      valuePtr,
+		usage:      usage,
+		validators: make([]FlagValidator, 0),
 	}
 
 	validateFlag(flag)

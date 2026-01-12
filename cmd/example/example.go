@@ -35,7 +35,7 @@ var (
 	port          int           = 8080
 	start         time.Time     = time.Now()
 	timeout       time.Duration = 5 * time.Second
-	durationValue               = 5
+	durationValue time.Duration = 5 * time.Second
 
 	upperValue bool
 )
@@ -69,37 +69,37 @@ func main() {
 	log.SetFlags(log.Lshortfile)
 	cli := goflag.New()
 
-	cli.Flag(goflag.FlagString, "config", "c", &config, "Path to config file").Required()
-	cli.Flag(goflag.FlagBool, "verbose", "v", &verbose, "Enable verbose output")
-	cli.Flag(goflag.FlagDuration, "timeout", "t", &timeout, "Timeout for the request")
-	cli.Flag(goflag.FlagInt, "port", "p", &port, "Port to listen on")
-	cli.Flag(goflag.FlagString, "hostport", "h", &hpVal, "Host:Port to listen on")
-	cli.Flag(goflag.FlagTime, "start", "s", &start, "Start time")
-	cli.Flag(goflag.FlagURL, "url", "u", &urlValue, "URL to fetch")
-	cli.Flag(goflag.FlagUUID, "uuid", "i", &uuidVal, "UUID to use")
-	cli.Flag(goflag.FlagIP, "ip", "i", &ipVal, "IP to use")
-	cli.Flag(goflag.FlagMAC, "mac", "m", &macVal, "MAC address to use")
-	cli.Flag(goflag.FlagEmail, "email", "e", &emailVal, "Email address to use")
-	cli.Flag(goflag.FlagFilePath, "file", "f", &fileVal, "File path to use")
-	cli.Flag(goflag.FlagDirPath, "dir", "d", &dirVal, "Directory path to use")
+	cli.String("config", "c", &config, "Path to config file")
+	cli.Bool("verbose", "v", &verbose, "Enable verbose output")
+	cli.Duration("timeout", "t", &timeout, "Timeout for the request")
+	cli.Int("port", "p", &port, "Port to listen on")
+	cli.HostPortPair("hostport", "h", &hpVal, "Host:Port to listen on")
+	cli.Time("start", "s", &start, "Start time")
+	cli.URL("url", "u", &urlValue, "URL to fetch")
+	cli.UUID("uuid", "i", &uuidVal, "UUID to use")
+	cli.IP("ip", "i", &ipVal, "IP to use")
+	cli.MAC("mac", "m", &macVal, "MAC address to use")
+	cli.Email("email", "e", &emailVal, "Email address to use")
+	cli.FilePath("file", "f", &fileVal, "File path to use")
+	cli.DirPath("dir", "d", &dirVal, "Directory path to use")
 
 	cli.SubCommand("greet", "Greet a person", greetUser).
-		Flag(goflag.FlagString, "name", "n", &name, "Name of the person to greet").Required().
-		Flag(goflag.FlagString, "greeting", "g", &greeting, "Greeting to use").
-		Flag(goflag.FlagBool, "upper", "u", &upperValue, "Print in upper case")
+		String("name", "n", &name, "Name of the person to greet").Required().
+		String("greeting", "g", &greeting, "Greeting to use").
+		Bool("upper", "u", &upperValue, "Print in upper case")
 
 	cli.SubCommand("version", "Print version", printVersion).
-		Flag(goflag.FlagBool, "verbose", "v", &verbose, "Enable verbose output").
-		Flag(goflag.FlagBool, "short", "s", &short, "Print short version")
+		Bool("verbose", "v", &verbose, "Enable verbose output").
+		Bool("short", "s", &short, "Print short version")
 
 	cli.SubCommand("sleep", "Sleep for a while", handleSleep).
-		Flag(goflag.FlagInt, "time", "t", &durationValue, "Time to sleep in seconds").Required()
+		Duration("time", "t", &durationValue, "Time to sleep in seconds").Required()
 
 	cli.SubCommand("cors", "Enable CORS", handleCors).
-		Flag(goflag.FlagStringSlice, "origins", "o", &origins, "Allowed origins").Required().
-		Flag(goflag.FlagStringSlice, "methods", "m", &methods, "Allowed methods").Required().
-		Flag(goflag.FlagStringSlice, "headers", "d", &headers, "Allowed headers").Required().
-		Flag(goflag.FlagBool, "credentials", "c", &credentials, "Allow credentials")
+		StringSlice("origins", "o", &origins, "Allowed origins").Required().
+		StringSlice("methods", "m", &methods, "Allowed methods").Required().
+		StringSlice("headers", "d", &headers, "Allowed headers").Required().
+		Bool("credentials", "c", &credentials, "Allow credentials")
 
 	// Parse the command line arguments and return the matching subcommand
 	subcmd, err := cli.Parse(os.Args)
@@ -113,29 +113,29 @@ func main() {
 	}
 
 	// Print the values
-	// fmt.Println("Config: ", config)
-	// fmt.Println("Verbose: ", verbose)
-	// fmt.Println("Timeout: ", timeout)
-	// fmt.Println("Port: ", port)
-	// fmt.Println("Start: ", start)
+	fmt.Println("Config: ", config)
+	fmt.Println("Verbose: ", verbose)
+	fmt.Println("Timeout: ", timeout)
+	fmt.Println("Port: ", port)
+	fmt.Println("Start: ", start)
 
-	// fmt.Println("URL: ", urlValue)
-	// fmt.Println("UUID: ", uuidVal)
-	// fmt.Println("IP: ", ipVal)
-	// fmt.Println("MAC: ", macVal)
-	// fmt.Println("Email: ", emailVal)
-	// fmt.Println("HostPort: ", hpVal)
-	// fmt.Println("File: ", fileVal)
-	// fmt.Println("Dir: ", dirVal)
+	fmt.Println("URL: ", urlValue)
+	fmt.Println("UUID: ", uuidVal)
+	fmt.Println("IP: ", ipVal)
+	fmt.Println("MAC: ", macVal)
+	fmt.Println("Email: ", emailVal)
+	fmt.Println("HostPort: ", hpVal)
+	fmt.Println("File: ", fileVal)
+	fmt.Println("Dir: ", dirVal)
 
-	// fmt.Println("Origins: ", origins)
-	// fmt.Println("Methods: ", methods)
-	// fmt.Println("Headers: ", headers)
-	// fmt.Println("Credentials: ", credentials)
+	fmt.Println("Origins: ", origins)
+	fmt.Println("Methods: ", methods)
+	fmt.Println("Headers: ", headers)
+	fmt.Println("Credentials: ", credentials)
 
-	// fmt.Println("Name: ", name)
-	// fmt.Println("Greeting: ", greeting)
-	// fmt.Println("Short: ", short)
-	// fmt.Println("Duration: ", durationValue)
+	fmt.Println("Name: ", name)
+	fmt.Println("Greeting: ", greeting)
+	fmt.Println("Short: ", short)
+	fmt.Println("Duration: ", durationValue)
 
 }

@@ -15,46 +15,48 @@ import (
 	"strings"
 )
 
-//go:generate go tool stringer -type FlagType
+//go:generate go tool stringer -type flagType
 
-type FlagType int
+type flagType int
 
 const (
-	FlagString FlagType = iota
-	FlagInt
-	FlagInt64
-	FlagFloat32
-	FlagFloat64
-	FlagBool
-	FlagRune
-	FlagDuration
-	FlagStringSlice
-	FlagIntSlice
-	FlagTime
-	FlagIP
-	FlagMAC
-	FlagURL
-	FlagUUID
-	FlagHostPortPair
-	FlagEmail
-	FlagFilePath
-	FlagDirPath
+	flagString flagType = iota
+	flagInt
+	flagInt64
+	flagFloat32
+	flagFloat64
+	flagBool
+	flagRune
+	flagDuration
+	flagStringSlice
+	flagIntSlice
+	flagTime
+	flagIP
+	flagMAC
+	flagURL
+	flagUUID
+	flagHostPortPair
+	flagEmail
+	flagFilePath
+	flagDirPath
 )
+
+type FlagValidator func(value any) (valid bool, errmsg string)
 
 // A Flag as parsed from the command line.
 type Flag struct {
-	flagType  FlagType
-	name      string
-	shortName string
-	value     any // pointer to default value. Will be populated by Parse.
-	usage     string
-	required  bool
-	validator func(any) (bool, string)
+	flagType   flagType
+	name       string
+	shortName  string
+	value      any // pointer to default value. Will be populated by Parse.
+	usage      string
+	required   bool
+	validators []FlagValidator
 }
 
 // Add validator to last flag in the subcommand chain. If no flag exists, it panics.
-func (flag *Flag) Validate(validator func(any) (bool, string)) *Flag {
-	flag.validator = validator
+func (flag *Flag) Validate(validators ...FlagValidator) *Flag {
+	flag.validators = append(flag.validators, validators...)
 	return flag
 }
 
@@ -76,7 +78,7 @@ var completionCmd *subcommand
 func New() *CLI {
 	cli := &CLI{
 		flags: []*Flag{
-			{name: "help", shortName: "h", flagType: FlagBool, usage: "Print help message and exit"},
+			{name: "help", shortName: "h", flagType: flagBool, usage: "Print help message and exit"},
 		},
 	}
 
@@ -118,7 +120,7 @@ func New() *CLI {
 }
 
 // Add a flag to the context.
-func (c *CLI) Flag(flagType FlagType, name, shortName string, valuePtr any, usage string) *Flag {
+func (c *CLI) addFlag(flagType flagType, name, shortName string, valuePtr any, usage string) *Flag {
 	flag := &Flag{
 		flagType:  flagType,
 		name:      name,
@@ -150,7 +152,7 @@ func (c *CLI) SubCommand(name, description string, handler func()) *subcommand {
 		description: description,
 		Handler:     handler,
 		flags: []*Flag{
-			{name: "help", shortName: "h", flagType: FlagString, usage: "Print help message and exit"},
+			{name: "help", shortName: "h", flagType: flagString, usage: "Print help message and exit"},
 		},
 	}
 	c.subcommands = append(c.subcommands, cmd)
@@ -327,7 +329,7 @@ func parseFlags(flags *[]*Flag, name string, i int, argv []string) (*Flag, error
 	// look at the next arg for the value.
 	valueIndex := i + 1
 	if (valueIndex) >= len(argv) {
-		if flag.flagType == FlagBool { // bool falg may have no value associated. e.g. --verbose
+		if flag.flagType == flagBool { // bool falg may have no value associated. e.g. --verbose
 			*flag.value.(*bool) = true
 			return flag, nil
 		}
@@ -340,7 +342,7 @@ func parseFlags(flags *[]*Flag, name string, i int, argv []string) (*Flag, error
 	}
 
 	if argv[valueIndex][0] == '-' {
-		if flag.flagType == FlagBool { // bool falg may have no value.
+		if flag.flagType == flagBool { // bool falg may have no value.
 			*flag.value.(*bool) = true
 			return flag, nil
 		}
@@ -354,12 +356,14 @@ func parseFlags(flags *[]*Flag, name string, i int, argv []string) (*Flag, error
 		return flag, err
 	}
 
-	// validate the flag.
-	if flag.validator != nil {
-		// dereference the pointer to get the value.
-		value := reflect.ValueOf(flag.value).Elem().Interface()
-		if valid, errMsg := flag.validator(value); !valid {
-			return flag, fmt.Errorf("invalid value (%v) for flag [--%s]: %v", value, flag.name, errMsg)
+	// validate the flag by calling all validators in sequence.
+	for _, validator := range flag.validators {
+		if validator != nil {
+			// dereference the pointer to get the value.
+			value := reflect.ValueOf(flag.value).Elem().Interface()
+			if valid, errMsg := validator(value); !valid {
+				return flag, fmt.Errorf("invalid value (%v) for flag [--%s]: %v", value, flag.name, errMsg)
+			}
 		}
 	}
 	return flag, nil
@@ -375,7 +379,7 @@ func printFlag(flag *Flag, w io.Writer, longestFlagName int, indent string) {
 		value = fmt.Sprintf("%v", reflect.ValueOf(flag.value).Elem().Interface())
 	}
 
-	if flag.flagType == FlagString {
+	if flag.flagType == flagString {
 		if flag.shortName != "" {
 			fmt.Fprintf(w, "-%s: %s (default: %q)\n", flag.shortName, flag.usage, value)
 		} else {

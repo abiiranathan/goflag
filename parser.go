@@ -17,45 +17,45 @@ import (
 // Returns the converted value from string based on flag type.
 func parseFlagValue(flag *Flag, value string) error {
 	switch flag.flagType {
-	case FlagString:
+	case flagString:
 		*flag.value.(*string) = value
 		return nil
-	case FlagInt:
+	case flagInt:
 		intValue, err := ParseInt(value)
 		if err != nil {
 			return err
 		}
 		*flag.value.(*int) = intValue
 		return nil
-	case FlagInt64:
+	case flagInt64:
 		int64Value, err := ParseInt64(value)
 		if err != nil {
 			return err
 		}
 		*flag.value.(*int64) = int64Value
 		return nil
-	case FlagFloat32:
+	case flagFloat32:
 		float32Value, err := ParseFloat32(value)
 		if err != nil {
 			return err
 		}
 		*flag.value.(*float32) = float32Value
 		return nil
-	case FlagFloat64:
+	case flagFloat64:
 		float64Value, err := ParseFloat64(value)
 		if err != nil {
 			return err
 		}
 		*flag.value.(*float64) = float64Value
 		return nil
-	case FlagBool:
+	case flagBool:
 		boolValue, err := ParseBool(value)
 		if err != nil {
 			return err
 		}
 		*flag.value.(*bool) = boolValue
 		return nil
-	case FlagStringSlice:
+	case flagStringSlice:
 		stringSliceValue, err := ParseStringSlice(value)
 		if err != nil {
 			return err
@@ -63,84 +63,84 @@ func parseFlagValue(flag *Flag, value string) error {
 		*flag.value.(*[]string) = stringSliceValue
 		return nil
 
-	case FlagIntSlice:
+	case flagIntSlice:
 		intSliceValue, err := ParseIntSlice(value)
 		if err != nil {
 			return err
 		}
 		*flag.value.(*[]int) = intSliceValue
 		return nil
-	case FlagRune:
+	case flagRune:
 		runeValue, err := ParseRune(value)
 		if err != nil {
 			return err
 		}
 		*flag.value.(*rune) = runeValue
 		return nil
-	case FlagDuration:
+	case flagDuration:
 		durationValue, err := ParseDuration(value)
 		if err != nil {
 			return err
 		}
 		*flag.value.(*time.Duration) = durationValue
 		return nil
-	case FlagTime:
+	case flagTime:
 		timeValue, err := ParseTime(value)
 		if err != nil {
 			return err
 		}
 		*flag.value.(*time.Time) = timeValue
 		return nil
-	case FlagIP:
+	case flagIP:
 		ipValue, err := ParseIP(value)
 		if err != nil {
 			return err
 		}
 		*flag.value.(*net.IP) = ipValue
 		return nil
-	case FlagFilePath:
+	case flagFilePath:
 		filePath, err := ParseFilePath(value)
 		if err != nil {
 			return err
 		}
 		*flag.value.(*string) = filePath
 		return nil
-	case FlagDirPath:
+	case flagDirPath:
 		dirPath, err := ParseDirPath(value)
 		if err != nil {
 			return err
 		}
 		*flag.value.(*string) = dirPath
 		return nil
-	case FlagEmail:
+	case flagEmail:
 		email, err := ParseEmail(value)
 		if err != nil {
 			return err
 		}
 		*flag.value.(*string) = email
 		return nil
-	case FlagURL:
+	case flagURL:
 		uri, err := ParseUrl(value)
 		if err != nil {
 			return err
 		}
 		*flag.value.(*url.URL) = *uri
 		return nil
-	case FlagUUID:
+	case flagUUID:
 		uuidValue, err := ParseUUID(value)
 		if err != nil {
 			return err
 		}
 		*flag.value.(*uuid.UUID) = uuidValue
 		return nil
-	case FlagHostPortPair:
+	case flagHostPortPair:
 		hostPortPair, err := ParseHostPort(value)
 		if err != nil {
 			return err
 		}
 		*flag.value.(*string) = hostPortPair
 		return nil
-	case FlagMAC:
+	case flagMAC:
 		mac, err := ParseMAC(value)
 		if err != nil {
 			return err
