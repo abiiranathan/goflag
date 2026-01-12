@@ -16,51 +16,51 @@ import (
 
 // Returns the converted value from string based on flag type.
 func parseFlagValue(flag *Flag, value string) error {
-	switch flag.FlagType {
+	switch flag.flagType {
 	case FlagString:
-		*flag.Value.(*string) = value
+		*flag.value.(*string) = value
 		return nil
 	case FlagInt:
 		intValue, err := ParseInt(value)
 		if err != nil {
 			return err
 		}
-		*flag.Value.(*int) = intValue
+		*flag.value.(*int) = intValue
 		return nil
 	case FlagInt64:
 		int64Value, err := ParseInt64(value)
 		if err != nil {
 			return err
 		}
-		*flag.Value.(*int64) = int64Value
+		*flag.value.(*int64) = int64Value
 		return nil
 	case FlagFloat32:
 		float32Value, err := ParseFloat32(value)
 		if err != nil {
 			return err
 		}
-		*flag.Value.(*float32) = float32Value
+		*flag.value.(*float32) = float32Value
 		return nil
 	case FlagFloat64:
 		float64Value, err := ParseFloat64(value)
 		if err != nil {
 			return err
 		}
-		*flag.Value.(*float64) = float64Value
+		*flag.value.(*float64) = float64Value
 		return nil
 	case FlagBool:
 		boolValue, err := ParseBool(value)
 		if err != nil {
 			return err
 		}
-		*flag.Value.(*bool) = boolValue
+		*flag.value.(*bool) = boolValue
 		return nil
 	case FlagStringSlice:
 		stringSliceValue, err := ParseStringSlice(value)
 		if err != nil {
 			return err
 		}
-		*flag.Value.(*[]string) = stringSliceValue
+		*flag.value.(*[]string) = stringSliceValue
 		return nil
 
 	case FlagIntSlice:
@@ -68,89 +68,89 @@ func parseFlagValue(flag *Flag, value string) error {
 		if err != nil {
 			return err
 		}
-		*flag.Value.(*[]int) = intSliceValue
+		*flag.value.(*[]int) = intSliceValue
 		return nil
 	case FlagRune:
 		runeValue, err := ParseRune(value)
 		if err != nil {
 			return err
 		}
-		*flag.Value.(*rune) = runeValue
+		*flag.value.(*rune) = runeValue
 		return nil
 	case FlagDuration:
 		durationValue, err := ParseDuration(value)
 		if err != nil {
 			return err
 		}
-		*flag.Value.(*time.Duration) = durationValue
+		*flag.value.(*time.Duration) = durationValue
 		return nil
 	case FlagTime:
 		timeValue, err := ParseTime(value)
 		if err != nil {
 			return err
 		}
-		*flag.Value.(*time.Time) = timeValue
+		*flag.value.(*time.Time) = timeValue
 		return nil
 	case FlagIP:
 		ipValue, err := ParseIP(value)
 		if err != nil {
 			return err
 		}
-		*flag.Value.(*net.IP) = ipValue
+		*flag.value.(*net.IP) = ipValue
 		return nil
 	case FlagFilePath:
 		filePath, err := ParseFilePath(value)
 		if err != nil {
 			return err
 		}
-		*flag.Value.(*string) = filePath
+		*flag.value.(*string) = filePath
 		return nil
 	case FlagDirPath:
 		dirPath, err := ParseDirPath(value)
 		if err != nil {
 			return err
 		}
-		*flag.Value.(*string) = dirPath
+		*flag.value.(*string) = dirPath
 		return nil
 	case FlagEmail:
 		email, err := ParseEmail(value)
 		if err != nil {
 			return err
 		}
-		*flag.Value.(*string) = email
+		*flag.value.(*string) = email
 		return nil
 	case FlagURL:
 		uri, err := ParseUrl(value)
 		if err != nil {
 			return err
 		}
-		*flag.Value.(*url.URL) = *uri
+		*flag.value.(*url.URL) = *uri
 		return nil
 	case FlagUUID:
 		uuidValue, err := ParseUUID(value)
 		if err != nil {
 			return err
 		}
-		*flag.Value.(*uuid.UUID) = uuidValue
+		*flag.value.(*uuid.UUID) = uuidValue
 		return nil
 	case FlagHostPortPair:
 		hostPortPair, err := ParseHostPort(value)
 		if err != nil {
 			return err
 		}
-		*flag.Value.(*string) = hostPortPair
+		*flag.value.(*string) = hostPortPair
 		return nil
 	case FlagMAC:
 		mac, err := ParseMAC(value)
 		if err != nil {
 			return err
 		}
-		*flag.Value.(*net.HardwareAddr) = mac
+		*flag.value.(*net.HardwareAddr) = mac
 		return nil
 
 	}
 
-	return fmt.Errorf("unsupported flag type %s", flag.FlagType.String())
+	return fmt.Errorf("unsupported flag type %s", flag.flagType.String())
 }
 
 // Parse a string to an int.
@@ -271,7 +271,7 @@ func ParseIP(value string) (net.IP, error) {
 func ParseFilePath(value string) (string, error) {
 	filePath, err := filepath.Abs(value)
 	if err != nil {
-		return "", fmt.Errorf("unable to find absolute path to " + value)
+		return "", fmt.Errorf("unable to find absolute path to %s", value)
 	}
 
 	f, err := os.Stat(filePath)
@@ -289,12 +289,12 @@ func ParseFilePath(value string) (string, error) {
 func ParseDirPath(value string) (string, error) {
 	filePath, err := filepath.Abs(value)
 	if err != nil {
-		return "", fmt.Errorf("unable to find absolute path to " + value)
+		return "", fmt.Errorf("unable to find absolute path to %v", value)
 	}
 
 	f, err := os.Stat(filePath)
 	if err != nil {
-		return "", fmt.Errorf("can not stat: %s", err)
+		return "", fmt.Errorf("can not stat: %w", err)
 	}
 
 	if !f.IsDir() {

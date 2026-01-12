@@ -9,12 +9,14 @@ package goflag
 import (
 	"fmt"
 	"io"
+	"log"
 	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 )
 
-//go:generate stringer -type FlagType
+//go:generate go tool stringer -type FlagType
 
 type FlagType int
 
@@ -42,65 +44,116 @@ const (
 
 // A Flag as parsed from the command line.
 type Flag struct {
-	FlagType  FlagType
-	Name      string
-	ShortName string
-	Value     any // pointer to default value. Will be populated by Parse.
-	Usage     string
-	Required  bool
-	Validator func(any) (bool, string)
+	flagType  FlagType
+	name      string
+	shortName string
+	value     any // pointer to default value. Will be populated by Parse.
+	usage     string
+	required  bool
+	validator func(any) (bool, string)
 }
 
 // Add validator to last flag in the subcommand chain. If no flag exists, it panics.
 func (flag *Flag) Validate(validator func(any) (bool, string)) *Flag {
-	flag.Validator = validator
+	flag.validator = validator
+	return flag
+}
+
+func (flag *Flag) Required() *Flag {
+	flag.required = true
 	return flag
 }
 
 // Global flag context. Stores global flags and subcommands.
-type Context struct {
+type CLI struct {
 	flags       []*Flag
-	subcommands []*Subcommand
+	subcommands []*subcommand
 }
 
-// Create a new flag context.
-func NewContext() *Context {
-	return &Context{
+// The completion subcommand.
+var completionCmd *subcommand
+
+// Create a new command-line interface.
+func New() *CLI {
+	cli := &CLI{
 		flags: []*Flag{
-			{Name: "help", ShortName: "h", FlagType: FlagBool, Usage: "Print help message and exit"},
+			{name: "help", shortName: "h", flagType: FlagBool, usage: "Print help message and exit"},
 		},
 	}
+
+	// Add completion subcommand for all CLIs
+	var shell string
+	var install bool
+	var uninstall bool
+
+	completionCmd = cli.SubCommand("completion", "Generate shell completion scripts", func() {
+		binName := filepath.Base(os.Args[0])
+
+		if shell == "" {
+			log.Fatal("Error: --shell flag is required\n")
+		}
+
+		// Check for conflicting flags
+		if install && uninstall {
+			log.Fatal("Error: cannot use --install and --uninstall together\n")
+		}
+
+		if uninstall {
+			// Uninstall the completion script
+			if err := uninstallCompletion(shell, binName); err != nil {
+				log.Fatalf("Failed to uninstall completion: %v\n", err)
+			}
+		} else if install {
+			// Install the completion script
+			var generateFunc func(io.Writer)
+			switch shell {
+			case "bash":
+				generateFunc = cli.GenBashCompletion
+			case "zsh":
+				generateFunc = cli.GenZshCompletion
+			default:
+				log.Fatalf("Unsupported shell: %s\n", shell)
+			}
+
+			if err := installCompletion(shell, binName, generateFunc); err != nil {
+				log.Fatalf("Failed to install completion: %v\n", err)
+			}
+		} else {
+			// Just print to stdout
+			switch shell {
+			case "bash":
+				cli.GenBashCompletion(os.Stdout)
+			case "zsh":
+				cli.GenZshCompletion(os.Stdout)
+			default:
+				log.Fatalf("Unsupported shell: %s\n", shell)
+			}
+		}
+	}).
+		FlagString("shell", "s", &shell, "The shell to generate completions for [bash|zsh]").Required().
+		FlagBool("install", "i", &install, "Install the completion script to the appropriate location").
+		FlagBool("uninstall", "u", &uninstall, "Uninstall the completion script")
+
+	return cli
 }
 
 // Add a flag to the context.
-func (ctx *Context) AddFlag(flagType FlagType, name, shortName string, valuePtr any, usage string, required bool, validator ...func(any) (bool, string)) *Flag {
+func (c *CLI) Flag(flagType FlagType, name, shortName string, valuePtr any, usage string) *Flag {
 	flag := &Flag{
-		FlagType:  flagType,
-		Name:      name,
-		ShortName: shortName,
-		Value:     valuePtr,
-		Usage:     usage,
-		Required:  required,
-	}
-
-	if len(validator) > 0 {
-		flag.Validator = validator[0]
+		flagType:  flagType,
+		name:      name,
+		shortName: shortName,
+		value:     valuePtr,
+		usage:     usage,
 	}
 
 	validateFlag(flag)
-	ctx.flags = append(ctx.flags, flag)
+	c.flags = append(c.flags, flag)
 	return flag
 }
 
-// Add a flag to a subcommand.
-func (ctx *Context) AddFlagPtr(flag *Flag) *Flag {
-	validateFlag(flag)
-	ctx.flags = append(ctx.flags, flag)
-	return flag
-}
-
-// Add a subcommand to the context.
-func (ctx *Context) AddSubCommand(name, description string, handler func()) *Subcommand {
+// Add a subcommand to the command-line context.
+func (c *CLI) SubCommand(name, description string, handler func()) *subcommand {
 	if handler == nil {
 		panic("subcommand can not be registered with nil handler")
 	}
@@ -112,15 +165,15 @@ func (ctx *Context) AddSubCommand(name, description string, handler func()) *Sub
 		panic("subcommand description can't be empty")
 	}
 
-	cmd := &Subcommand{
+	cmd := &subcommand{
 		name:        name,
 		description: description,
 		Handler:     handler,
 		flags: []*Flag{
-			{Name: "help", ShortName: "h", FlagType: FlagString, Usage: "Print help message and exit"},
+			{name: "help", shortName: "h", flagType: FlagString, usage: "Print help message and exit"},
 		},
 	}
-	ctx.subcommands = append(ctx.subcommands, cmd)
+	c.subcommands = append(c.subcommands, cmd)
 
 	// add the help flag to the subcommand.
 	return cmd
@@ -131,8 +184,8 @@ func (ctx *Context) AddSubCommand(name, description string, handler func()) *Sub
 //
 // Populates the values of the flags and also finds the matching subcommand.
 // Returns the matching subcommand.
-func (ctx *Context) Parse(argv []string) (*Subcommand, error) {
-	var subcmd *Subcommand = nil
+func (c *CLI) Parse(argv []string) (*subcommand, error) {
+	var subcmd *subcommand = nil
 	subCommandIndex := -1
 
 	// store processed flags.
@@ -172,12 +225,12 @@ func (ctx *Context) Parse(argv []string) (*Subcommand, error) {
 				// short flag
 				name = arg[1:]
 			} else {
-				if len(ctx.subcommands) == 0 {
+				if len(c.subcommands) == 0 {
 					continue
 				}
 
 				// subcommand or flag value.
-				for _, cmd := range ctx.subcommands {
+				for _, cmd := range c.subcommands {
 					if cmd.name == arg {
 						subcmd = cmd
 						subCommandIndex = i
@@ -188,11 +241,11 @@ func (ctx *Context) Parse(argv []string) (*Subcommand, error) {
 			}
 
 			if isHelpFlag(name) {
-				ctx.PrintUsage(os.Stdout)
+				c.PrintUsage(os.Stdout)
 				os.Exit(0)
 			}
 
-			flag, err := parseFlags(&ctx.flags, name, i, argv)
+			flag, err := parseFlags(&c.flags, name, i, argv)
 			if err != nil {
 				return nil, err
 			}
@@ -200,7 +253,7 @@ func (ctx *Context) Parse(argv []string) (*Subcommand, error) {
 			if flag != nil {
 				// Store the processed flag.
 				// This is used to check if all required global flags are present.
-				processedGlobalFlags[flag.Name] = true
+				processedGlobalFlags[flag.name] = true
 			}
 		}
 	}
@@ -208,9 +261,11 @@ func (ctx *Context) Parse(argv []string) (*Subcommand, error) {
 	// check if all required global flags are present.
 	// Done after parsing the subcommand flags so that the subcommand help can be printed.
 	// if the global flags are missing.
-	for _, flag := range ctx.flags {
-		if _, found := processedGlobalFlags[flag.Name]; !found && flag.Required {
-			return nil, fmt.Errorf("missing required flag %q", flag.Name)
+	if subcmd != completionCmd {
+		for _, flag := range c.flags {
+			if _, found := processedGlobalFlags[flag.name]; !found && flag.required {
+				return nil, fmt.Errorf("missing required flag [-%s | --%s]", flag.shortName, flag.name)
+			}
 		}
 	}
 
@@ -264,14 +319,14 @@ func (ctx *Context) Parse(argv []string) (*Subcommand, error) {
 		if flag != nil {
 			// Store the processed flag.
 			// This is used to check if all required subcommand flags are present.
-			processedSubCommandFlags[flag.Name] = true
+			processedSubCommandFlags[flag.name] = true
 		}
 	}
 
 	// check if all required subcommand flags are present.
 	for _, flag := range subcmd.flags {
-		if _, found := processedSubCommandFlags[flag.Name]; !found && flag.Required {
-			return nil, fmt.Errorf("missing required flag %q", flag.Name)
+		if _, found := processedSubCommandFlags[flag.name]; !found && flag.required {
+			return nil, fmt.Errorf("missing required flag [-%s | --%s]", flag.shortName, flag.name)
 		}
 	}
 
@@ -292,24 +347,24 @@ func parseFlags(flags *[]*Flag, name string, i int, argv []string) (*Flag, error
 	// look at the next arg for the value.
 	valueIndex := i + 1
 	if (valueIndex) >= len(argv) {
-		if flag.FlagType == FlagBool { // bool falg may have no value associated. e.g. --verbose
-			*flag.Value.(*bool) = true
+		if flag.flagType == FlagBool { // bool falg may have no value associated. e.g. --verbose
+			*flag.value.(*bool) = true
 			return flag, nil
 		}
-		return flag, fmt.Errorf("missing value for flag %q", flag.Name)
+		return flag, fmt.Errorf("missing value for flag [-%s | --%s]", flag.shortName, flag.name)
 	}
 
 	if argv[valueIndex] == "" {
 		// empty string, accessing argv[valueIndex][0] will panic.
-		return flag, fmt.Errorf("empty value for flag %q", flag.Name)
+		return flag, fmt.Errorf("empty value for flag [-%s | --%s]", flag.shortName, flag.name)
 	}
 
 	if argv[valueIndex][0] == '-' {
-		if flag.FlagType == FlagBool { // bool falg may have no value.
-			*flag.Value.(*bool) = true
+		if flag.flagType == FlagBool { // bool falg may have no value.
+			*flag.value.(*bool) = true
 			return flag, nil
 		}
-		return flag, fmt.Errorf("missing value for flag %q", flag.Name)
+		return flag, fmt.Errorf("missing value for flag [-%s | --%s]", flag.shortName, flag.name)
 	}
 
 	var err error
@@ -320,11 +375,11 @@ func parseFlags(flags *[]*Flag, name string, i int, argv []string) (*Flag, error
 	}
 
 	// validate the flag.
-	if flag.Validator != nil {
+	if flag.validator != nil {
 		// dereference the pointer to get the value.
-		value := reflect.ValueOf(flag.Value).Elem().Interface()
-		if valid, errMsg := flag.Validator(value); !valid {
-			return flag, fmt.Errorf("invalid value(%v) for flag %q: %s", flag.Value, flag.Name, errMsg)
+		value := reflect.ValueOf(flag.value).Elem().Interface()
+		if valid, errMsg := flag.validator(value); !valid {
+			return flag, fmt.Errorf("invalid value (%v) for flag [-%s | --%s]: %v", flag.value, flag.shortName, flag.name, errMsg)
 		}
 	}
 	return flag, nil
@@ -333,25 +388,34 @@ func parseFlags(flags *[]*Flag, name string, i int, argv []string) (*Flag, error
 // Print a flag to the writer.
 // Called by PrintUsage for each flag.
 func printFlag(flag *Flag, w io.Writer, longestFlagName int, indent string) {
-	fmt.Fprintf(w, "%s--%-*s ", indent, longestFlagName, flag.Name)
-	valid := reflect.ValueOf(flag.Value).IsValid()
+	fmt.Fprintf(w, "%s--%-*s ", indent, longestFlagName, flag.name)
+	valid := reflect.ValueOf(flag.value).IsValid()
 	value := ""
 	if valid {
-		value = fmt.Sprintf("%v", reflect.ValueOf(flag.Value).Elem().Interface())
+		value = fmt.Sprintf("%v", reflect.ValueOf(flag.value).Elem().Interface())
 	}
 
-	if flag.ShortName != "" {
-		fmt.Fprintf(w, "-%s: %s (default: %s)\n", flag.ShortName, flag.Usage, value)
+	if flag.flagType == FlagString {
+		if flag.shortName != "" {
+			fmt.Fprintf(w, "-%s: %s (default: %q)\n", flag.shortName, flag.usage, value)
+		} else {
+			fmt.Fprintf(w, "%s (default: %q)\n", flag.usage, value)
+		}
 	} else {
-		fmt.Fprintf(w, "%s (default: %s)\n", flag.Usage, value)
+		if flag.shortName != "" {
+			fmt.Fprintf(w, "-%s: %s (default: %v)\n", flag.shortName, flag.usage, value)
+		} else {
+			fmt.Fprintf(w, "%s (default: %v)\n", flag.usage, value)
+		}
 	}
+
 }
 
 // Parse the flag value and set the flag value.
 func findFlag(flags []*Flag, name string) *Flag {
 	for index := range flags {
 		flag := flags[index]
-		if flag.Name == name || flag.ShortName == name {
+		if flag.name == name || flag.shortName == name {
 			return flag
 		}
 	}
@@ -364,23 +428,23 @@ func isHelpFlag(name string) bool {
 
 // Print a subcommand to the writer.
 // Called by PrintUsage for each subcommand.
-func printSubCommand(cmd *Subcommand, w io.Writer) {
+func printSubCommand(cmd *subcommand, w io.Writer) {
 	fmt.Fprintf(w, "%s: %s", cmd.name, cmd.description)
 	fmt.Fprintln(w)
 
 	longestFlagName := 0
 	for _, flag := range cmd.flags {
-		if flag.Name == "help" {
+		if flag.name == "help" {
 			continue
 		}
-		if len(flag.Name) > longestFlagName {
-			longestFlagName = len(flag.Name)
+		if len(flag.name) > longestFlagName {
+			longestFlagName = len(flag.name)
 		}
 	}
 
 	// print the subcommand flags.
 	for _, flag := range cmd.flags {
-		if flag.Name == "help" {
+		if flag.name == "help" {
 			continue
 		}
 		printFlag(flag, w, longestFlagName, "    ")
@@ -396,17 +460,17 @@ func printSubCommand(cmd *Subcommand, w io.Writer) {
 //
 // Help for a given subcommand can be printed by passing the subcommand name as the
 // glag --subcommand or -c. e.g. --help -c greet
-func (ctx *Context) PrintUsage(w io.Writer) {
+func (c *CLI) PrintUsage(w io.Writer) {
 	longestFlagName := 0
-	for _, flag := range ctx.flags {
-		if len(flag.Name) > longestFlagName {
-			longestFlagName = len(flag.Name)
+	for _, flag := range c.flags {
+		if len(flag.name) > longestFlagName {
+			longestFlagName = len(flag.name)
 		}
 	}
 
 	// find the longest subcommand name.
 	longestSubCommandName := 0
-	for _, cmd := range ctx.subcommands {
+	for _, cmd := range c.subcommands {
 		if len(cmd.name) > longestSubCommandName {
 			longestSubCommandName = len(cmd.name)
 		}
@@ -415,7 +479,7 @@ func (ctx *Context) PrintUsage(w io.Writer) {
 	fmt.Fprintf(w, "Usage: %s [global flags] [subcommand] [subcommand flags]\n", os.Args[0])
 	// print the global flags.
 	fmt.Fprintf(w, "Global Flags:\n")
-	for _, flag := range ctx.flags {
+	for _, flag := range c.flags {
 		printFlag(flag, w, longestFlagName, "  ")
 	}
 
@@ -423,7 +487,7 @@ func (ctx *Context) PrintUsage(w io.Writer) {
 
 	// print the subcommands.
 	fmt.Fprintf(w, "Subcommands:\n")
-	for _, cmd := range ctx.subcommands {
+	for _, cmd := range c.subcommands {
 		printSubCommand(cmd, w)
 	}
 }

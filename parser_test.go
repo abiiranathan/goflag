@@ -167,7 +167,7 @@ func TestParseFlagValue(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			flag := &Flag{FlagType: tt.flagType, Value: reflect.New(reflect.TypeOf(tt.want)).Interface(), Required: true}
+			flag := &Flag{flagType: tt.flagType, value: reflect.New(reflect.TypeOf(tt.want)).Interface(), required: true}
 			err := parseFlagValue(flag, tt.value)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("parseFlagValue() error = %v, wantErr %v", err, tt.wantErr)
@@ -175,7 +175,7 @@ func TestParseFlagValue(t *testing.T) {
 			}
 
 			// dereference the pointer
-			got := reflect.ValueOf(flag.Value).Elem().Interface()
+			got := reflect.ValueOf(flag.value).Elem().Interface()
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("parseFlagValue() = %v, want %v", got, tt.want)
 			}
@@ -332,15 +332,15 @@ func TestParseFlagWithInvalidValue(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			flag := &Flag{FlagType: tt.flagType, Value: reflect.New(reflect.TypeOf(tt.want)).Interface(), Required: true}
+			flag := &Flag{flagType: tt.flagType, value: reflect.New(reflect.TypeOf(tt.want)).Interface(), required: true}
 			err := parseFlagValue(flag, tt.value)
 			if err == nil {
-				t.Errorf("parseFlagValue(%s) error expected to fail but got no error", flag.Name)
+				t.Errorf("parseFlagValue(%s) error expected to fail but got no error", flag.name)
 				return
 			}
 
 			// dereference the pointer
-			got := reflect.ValueOf(flag.Value).Elem().Interface()
+			got := reflect.ValueOf(flag.value).Elem().Interface()
 			if reflect.DeepEqual(got, tt.want) {
 				t.Errorf("parseFlagValue() = %v should not equal %v", got, tt.want)
 			}

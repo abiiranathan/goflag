@@ -34,8 +34,9 @@ const _FlagType_name = "FlagStringFlagIntFlagInt64FlagFloat32FlagFloat64FlagBool
 var _FlagType_index = [...]uint8{0, 10, 17, 26, 37, 48, 56, 64, 76, 91, 103, 111, 117, 124, 131, 139, 155, 164, 176, 187}
 
 func (i FlagType) String() string {
-	if i < 0 || i >= FlagType(len(_FlagType_index)-1) {
+	idx := int(i) - 0
+	if i < 0 || idx >= len(_FlagType_index)-1 {
 		return "FlagType(" + strconv.FormatInt(int64(i), 10) + ")"
 	}
-	return _FlagType_name[_FlagType_index[i]:_FlagType_index[i+1]]
+	return _FlagType_name[_FlagType_index[idx]:_FlagType_index[idx+1]]
 }

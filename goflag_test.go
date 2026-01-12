@@ -8,45 +8,45 @@ import (
 )
 
 func TestParse(t *testing.T) {
-	ctx := NewContext()
+	ctx := New()
 	var (
 		name   string = "World"
 		age    int    = 20
 		height int    = 0
 	)
 
-	ctx.subcommands = []*Subcommand{
+	ctx.subcommands = []*subcommand{
 		{
 			name:        "test",
 			description: "Test command",
 			flags: []*Flag{
 				{
-					Name:      "name",
-					FlagType:  FlagString,
-					Value:     &name,
-					ShortName: "n",
-					Required:  true,
-					Usage:     "Your name",
-					Validator: func(value any) (bool, string) {
+					name:      "name",
+					flagType:  FlagString,
+					value:     &name,
+					shortName: "n",
+					required:  true,
+					usage:     "Your name",
+					validator: func(value any) (bool, string) {
 						return value != "", "Name cannot be empty"
 					},
 				},
 				{
-					Name:      "age",
-					FlagType:  FlagInt,
-					Value:     &age,
-					ShortName: "a",
-					Required:  true,
-					Usage:     "Your age",
+					name:      "age",
+					flagType:  FlagInt,
+					value:     &age,
+					shortName: "a",
+					required:  true,
+					usage:     "Your age",
 				},
 				{
-					Name:      "height",
-					FlagType:  FlagInt,
-					Value:     &height,
-					ShortName: "l",
-					Required:  true,
-					Usage:     "Your height",
-					Validator: func(a any) (bool, string) {
+					name:      "height",
+					flagType:  FlagInt,
+					value:     &height,
+					shortName: "l",
+					required:  true,
+					usage:     "Your height",
+					validator: func(a any) (bool, string) {
 						return a.(int) > 0, "Height must be greater than 0"
 					},
 				},
@@ -63,21 +63,21 @@ func TestParse(t *testing.T) {
 			},
 			flags: []*Flag{
 				{
-					Name:      "age",
-					FlagType:  FlagInt,
-					Value:     &age,
-					ShortName: "a",
-					Required:  true,
-					Usage:     "Your age",
+					name:      "age",
+					flagType:  FlagInt,
+					value:     &age,
+					shortName: "a",
+					required:  true,
+					usage:     "Your age",
 				},
 				{
-					Name:      "height",
-					FlagType:  FlagInt,
-					Value:     &height,
-					ShortName: "l",
-					Required:  true,
-					Usage:     "Your height",
-					Validator: func(a any) (bool, string) {
+					name:      "height",
+					flagType:  FlagInt,
+					value:     &height,
+					shortName: "l",
+					required:  true,
+					usage:     "Your height",
+					validator: func(a any) (bool, string) {
 						return a.(int) > 0, "Height must be greater than 0"
 					},
 				},
@@ -125,34 +125,30 @@ func TestParse(t *testing.T) {
 
 	s2, err := ctx.Parse(argv2)
 	if err == nil {
-		t.Fatalf("Expected error, but got '%v'", err)
+		t.Fatalf("Expected error, but got nil\n")
 	}
 
 	if s2 != nil {
 		t.Fatalf("Expected subcommand to be not nil, but got nil")
 	}
 
-	if s2.name != "test2" {
-		t.Errorf("Expected subcommand name to be 'test2', but got '%v'", s2.name)
-	}
-
 	// check the flag values
-	if ctx.subcommands[0].flags[0].Value != "John" {
-		t.Errorf("Expected name flag value to be 'John', but got '%v'", ctx.subcommands[0].flags[0].Value)
+	if ctx.subcommands[0].flags[0].value.(string) != "John" {
+		t.Errorf("Expected name flag value to be 'John', but got '%v'", ctx.subcommands[0].flags[0].value)
 	}
 
-	if ctx.subcommands[1].flags[0].Value != 30 {
-		t.Errorf("Expected age flag value to be 30, but got '%v'", ctx.subcommands[1].flags[0].Value)
+	if ctx.subcommands[1].flags[0].value.(int) != 30 {
+		t.Errorf("Expected age flag value to be 30, but got '%v'", ctx.subcommands[1].flags[0].value)
 	}
 
 }
 
 func TestAddCommand(t *testing.T) {
-	ctx := NewContext()
+	ctx := New()
 	var name string
-	ctx.AddSubCommand("test", "Test command", func() {
+	ctx.SubCommand("test", "Test command", func() {
 		fmt.Println("Test command")
-	}).AddFlag(FlagString, "name", "n", &name, "Your name", true)
+	}).Flag(FlagString, "name", "n", &name, "Your name").Required()
 
 	// ctx.subCommands[0] is completions automatically inserted with NewContext.
 	// subcommand[0].flags[0] is the --help flag auto inserted by .AddFlag.
@@ -172,48 +168,48 @@ func TestAddCommand(t *testing.T) {
 		t.Errorf("Expected 2 flags, but got %v", len(ctx.subcommands[0].flags))
 	}
 
-	if ctx.subcommands[0].flags[1].Name != "name" {
-		t.Errorf("Expected flag name to be 'name', but got '%v'", ctx.subcommands[1].flags[1].Name)
+	if ctx.subcommands[0].flags[1].name != "name" {
+		t.Errorf("Expected flag name to be 'name', but got '%v'", ctx.subcommands[1].flags[1].name)
 	}
 }
 
 func TestPrintUsage(t *testing.T) {
 	// Set up test data
-	ctx := &Context{
+	ctx := &CLI{
 		flags: []*Flag{
 			{
-				Name:  "help",
-				Usage: "Show help message",
+				name:  "help",
+				usage: "Show help message",
 			},
 			{
-				Name:      "name",
-				ShortName: "n",
-				Usage:     "Name of the person",
+				name:      "name",
+				shortName: "n",
+				usage:     "Name of the person",
 			},
 			{
-				Name:      "age",
-				ShortName: "a",
-				Usage:     "Age of the person",
+				name:      "age",
+				shortName: "a",
+				usage:     "Age of the person",
 			},
 		},
-		subcommands: []*Subcommand{
+		subcommands: []*subcommand{
 			{
 				name:        "add",
 				description: "Add a new person",
 				flags: []*Flag{
 					{
-						Name:  "help",
-						Usage: "Show help message",
+						name:  "help",
+						usage: "Show help message",
 					},
 					{
-						Name:      "name",
-						ShortName: "n",
-						Usage:     "Name of the person",
+						name:      "name",
+						shortName: "n",
+						usage:     "Name of the person",
 					},
 					{
-						Name:      "age",
-						ShortName: "a",
-						Usage:     "Age of the person",
+						name:      "age",
+						shortName: "a",
+						usage:     "Age of the person",
 					},
 				},
 			},
@@ -222,13 +218,13 @@ func TestPrintUsage(t *testing.T) {
 				description: "Delete an existing person",
 				flags: []*Flag{
 					{
-						Name:  "help",
-						Usage: "Show help message",
+						name:  "help",
+						usage: "Show help message",
 					},
 					{
-						Name:      "name",
-						ShortName: "n",
-						Usage:     "Name of the person",
+						name:      "name",
+						shortName: "n",
+						usage:     "Name of the person",
 					},
 				},
 			},
@@ -268,46 +264,47 @@ func TestPrintUsage(t *testing.T) {
 }
 
 func TestAddFlag(t *testing.T) {
-	ctx := NewContext()
+	ctx := New()
 	var name string
-	ctx.AddFlag(FlagString, "name", "n", &name, "Your name", true)
+
+	ctx.Flag(FlagString, "name", "n", &name, "Your name").Required()
 
 	if len(ctx.flags) != 2 {
 		t.Errorf("Expected 2 flags, but got %v", len(ctx.flags))
 	}
 
-	if ctx.flags[1].Name != "name" {
-		t.Errorf("Expected flag name to be 'name', but got '%v'", ctx.flags[1].Name)
+	if ctx.flags[1].name != "name" {
+		t.Errorf("Expected flag name to be 'name', but got '%v'", ctx.flags[1].name)
 	}
 
-	if ctx.flags[1].ShortName != "n" {
-		t.Errorf("Expected flag short name to be 'n', but got '%v'", ctx.flags[1].ShortName)
+	if ctx.flags[1].shortName != "n" {
+		t.Errorf("Expected flag short name to be 'n', but got '%v'", ctx.flags[1].shortName)
 	}
 }
 
 func TestGlobalRequiredFlags(t *testing.T) {
 	// test global required flag
-	ctx := NewContext()
+	ctx := New()
 
 	var verbose bool
 	var port int
 
 	ctx.flags = []*Flag{
 		{
-			Name:      "verbose",
-			FlagType:  FlagBool,
-			Value:     &verbose,
-			ShortName: "v",
-			Usage:     "Enable verbose output",
-			Required:  true,
+			name:      "verbose",
+			flagType:  FlagBool,
+			value:     &verbose,
+			shortName: "v",
+			usage:     "Enable verbose output",
+			required:  true,
 		},
 		{
-			Name:      "port",
-			FlagType:  FlagInt,
-			Value:     &port,
-			ShortName: "p",
-			Usage:     "Port to listen on",
-			Required:  true,
+			name:      "port",
+			flagType:  FlagInt,
+			value:     &port,
+			shortName: "p",
+			usage:     "Port to listen on",
+			required:  true,
 		},
 	}
 
