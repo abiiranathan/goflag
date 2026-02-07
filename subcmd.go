@@ -22,6 +22,7 @@ func (cmd *subcommand) Validate(validators ...FlagValidator) *subcommand {
 	return cmd
 }
 
+// Sets the latest subcommand as required.
 func (cmd *subcommand) Required() *subcommand {
 	if len(cmd.flags) > 0 {
 		cmd.flags[len(cmd.flags)-1].required = true
@@ -45,8 +46,14 @@ func (cmd *subcommand) Flag(flagType flagType, name, shortName string, valuePtr 
 	return cmd
 }
 
+// Print help text for the subcommand.
 func (cmd *subcommand) PrintUsage(w io.Writer) {
 	printSubCommand(cmd, w)
+}
+
+// Returns the subcommand name.
+func (cmd *subcommand) Name() string {
+	return cmd.name
 }
 
 func validateFlag(flag *Flag) {
