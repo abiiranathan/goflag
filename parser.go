@@ -153,7 +153,7 @@ func parseFlagValue(flag *Flag, value string) error {
 	return fmt.Errorf("unsupported flag type %s", flag.flagType.String())
 }
 
-// Parse a string to an int.
+// ParseInt parses a string to an int.
 func ParseInt(value string) (int, error) {
 	result, err := strconv.Atoi(value)
 	if err != nil {
@@ -162,7 +162,7 @@ func ParseInt(value string) (int, error) {
 	return result, nil
 }
 
-// Parse a string to an int64.
+// ParseInt64 parses a string to an int64.
 func ParseInt64(value string) (int64, error) {
 	result, err := strconv.ParseInt(value, 10, 64)
 	if err != nil {
@@ -171,7 +171,7 @@ func ParseInt64(value string) (int64, error) {
 	return result, nil
 }
 
-// Parse a string to a float32.
+// ParseFloat32 parses a string to a float32.
 func ParseFloat32(value string) (float32, error) {
 	result, err := strconv.ParseFloat(value, 32)
 	if err != nil {
@@ -180,7 +180,7 @@ func ParseFloat32(value string) (float32, error) {
 	return float32(result), nil
 }
 
-// Parse a string to a float64.
+// ParseFloat64 parses a string to a float64.
 func ParseFloat64(value string) (float64, error) {
 	result, err := strconv.ParseFloat(value, 64)
 	if err != nil {
@@ -189,7 +189,7 @@ func ParseFloat64(value string) (float64, error) {
 	return result, nil
 }
 
-// Parse a string to a bool.
+// ParseBool parses a string to a bool.
 func ParseBool(value string) (bool, error) {
 	// if value is empty, return true.(default value e.g -v)
 	if value == "" {
@@ -203,7 +203,7 @@ func ParseBool(value string) (bool, error) {
 	return result, nil
 }
 
-// Parse a comma-seperated string into a slice of strings.
+// ParseStringSlice parses a comma-separated string into a slice of strings.
 func ParseStringSlice(value string) ([]string, error) {
 	parts := strings.Split(value, ",")
 	result := make([]string, len(parts))
@@ -213,7 +213,7 @@ func ParseStringSlice(value string) ([]string, error) {
 	return result, nil
 }
 
-// Parse a comma-seperated string into a slice of ints.
+// ParseIntSlice parses a comma-separated string into a slice of ints.
 func ParseIntSlice(value string) ([]int, error) {
 	parts := strings.Split(value, ",")
 	result := make([]int, len(parts))
@@ -228,7 +228,7 @@ func ParseIntSlice(value string) ([]int, error) {
 	return result, nil
 }
 
-// Parse a string to a rune.
+// ParseRune parses a string to a rune.
 func ParseRune(value string) (rune, error) {
 	if len(value) != 1 {
 		return ' ', fmt.Errorf("expected one character")
@@ -236,7 +236,7 @@ func ParseRune(value string) (rune, error) {
 	return rune(value[0]), nil
 }
 
-// Parse a string to a duration.
+// ParseDuration parses a string to a duration.
 // Uses time.ParseDuration. Supported units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
 // e.g 1h30m, 1h, 1m30s, 1m, 1m30s, 1ms, 1us, 1ns
 func ParseDuration(value string) (time.Duration, error) {
@@ -247,18 +247,34 @@ func ParseDuration(value string) (time.Duration, error) {
 	return duration, nil
 }
 
-// Parse a string to a time.Time.
-// Uses time.Parse. Supported formats are:
+// ParseTime parses a string to a time.Time.
+// Tries multiple formats in order until one succeeds. Supported formats are:
+// "2006-01-02T15:04:05Z07:00",
+// "2006-01-02T15:04:05Z0700",
+// "2006-01-02T15:04:05Z07",
+// "2006-01-02T15:04:05",
 // "2006-01-02T15:04 MST"
 func ParseTime(value string) (time.Time, error) {
-	layout := "2006-01-02T15:04 MST"
-	t, err := time.Parse(layout, value)
-	if err != nil {
-		return t, fmt.Errorf("invalid time value for flag %s. Suppoted format: 2006-01-02T15:04 MST", value)
+	layouts := []string{
+		"2006-01-02T15:04:05Z07:00",
+		"2006-01-02T15:04:05Z0700",
+		"2006-01-02T15:04:05Z07",
+		"2006-01-02T15:04:05",
+		"2006-01-02T15:04 MST",
 	}
-	return t, nil
+
+	var t time.Time
+	var err error
+	for _, layout := range layouts {
+		t, err = time.Parse(layout, value)
+		if err == nil {
+			return t, nil
+		}
+	}
+	return t, fmt.Errorf("invalid time value for flag %s. Supported formats: %v", value, layouts)
 }
 
+// ParseIP parses a string to a net.IP using net.ParseIP.
 func ParseIP(value string) (net.IP, error) {
 	ip := net.ParseIP(value)
 	if ip == nil {
@@ -267,7 +283,7 @@ func ParseIP(value string) (net.IP, error) {
 	return ip, nil
 }
 
-// Resolve absolute file path and check that it exists.
+// ParseFilePath resolves absolute file path and checks that it exists.
 func ParseFilePath(value string) (string, error) {
 	filePath, err := filepath.Abs(value)
 	if err != nil {
@@ -285,7 +301,7 @@ func ParseFilePath(value string) (string, error) {
 	return filePath, nil
 }
 
-// Resolve dirname from value and check that it exists.
+// ParseDirPath resolves absolute directory path and checks that it exists.
 func ParseDirPath(value string) (string, error) {
 	filePath, err := filepath.Abs(value)
 	if err != nil {
@@ -303,12 +319,12 @@ func ParseDirPath(value string) (string, error) {
 	return filePath, nil
 }
 
-// parse url from string with url.Parse.
+// ParseUrl parses a string to a url.URL using url.ParseRequestURI.
 func ParseUrl(value string) (*url.URL, error) {
 	return url.ParseRequestURI(value)
 }
 
-// parse email from string with mail.Parse
+// ParseEmail parses a string to an email address using mail.ParseAddress.
 func ParseEmail(value string) (string, error) {
 	email, err := mail.ParseAddress(value)
 	if err != nil {
@@ -317,7 +333,7 @@ func ParseEmail(value string) (string, error) {
 	return email.Address, nil
 }
 
-// parse host:port pair from value
+// ParseHostPort parses a host:port pair from a string.
 // An empty string is considered a valid host. :)
 // e.g ":8000" is a valid host-port pair.
 func ParseHostPort(value string) (string, error) {
@@ -346,12 +362,12 @@ func ParseHostPort(value string) (string, error) {
 func ParseMAC(value string) (net.HardwareAddr, error) {
 	mac, err := net.ParseMAC(value)
 	if err != nil {
-		return nil, fmt.Errorf("inavlid MAC address: %s", err)
+		return nil, fmt.Errorf("invalid MAC address: %s", err)
 	}
 	return mac, nil
 }
 
-// parse UUID using the github.com/google/uuid package.
+// ParseUUID parses a string to a uuid.UUID using the github.com/google/uuid package.
 func ParseUUID(value string) (uuid.UUID, error) {
 	id, err := uuid.Parse(value)
 	if err != nil {

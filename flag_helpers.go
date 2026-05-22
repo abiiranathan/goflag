@@ -259,132 +259,132 @@ func (c *CLI) DirPath(name, shortName string, valuePtr *string, usage string) *F
 // String adds a string flag to the subcommand.
 // See CLI.String for parameter details.
 // Returns the subcommand for method chaining.
-func (cmd *subcommand) String(name, shortName string, valuePtr *string, usage string) *subcommand {
+func (cmd *SubCMD) String(name, shortName string, valuePtr *string, usage string) *SubCMD {
 	return cmd.Flag(flagString, name, shortName, valuePtr, usage)
 }
 
 // Int adds an integer flag to the subcommand.
 // See CLI.Int for parameter details.
 // Returns the subcommand for method chaining.
-func (cmd *subcommand) Int(name, shortName string, valuePtr *int, usage string) *subcommand {
+func (cmd *SubCMD) Int(name, shortName string, valuePtr *int, usage string) *SubCMD {
 	return cmd.Flag(flagInt, name, shortName, valuePtr, usage)
 }
 
 // Int64 adds a 64-bit integer flag to the subcommand.
 // See CLI.Int64 for parameter details.
 // Returns the subcommand for method chaining.
-func (cmd *subcommand) Int64(name, shortName string, valuePtr *int64, usage string) *subcommand {
+func (cmd *SubCMD) Int64(name, shortName string, valuePtr *int64, usage string) *SubCMD {
 	return cmd.Flag(flagInt64, name, shortName, valuePtr, usage)
 }
 
 // Float32 adds a 32-bit floating point flag to the subcommand.
 // See CLI.Float32 for parameter details.
 // Returns the subcommand for method chaining.
-func (cmd *subcommand) Float32(name, shortName string, valuePtr *float32, usage string) *subcommand {
+func (cmd *SubCMD) Float32(name, shortName string, valuePtr *float32, usage string) *SubCMD {
 	return cmd.Flag(flagFloat32, name, shortName, valuePtr, usage)
 }
 
 // Float64 adds a 64-bit floating point flag to the subcommand.
 // See CLI.Float64 for parameter details.
 // Returns the subcommand for method chaining.
-func (cmd *subcommand) Float64(name, shortName string, valuePtr *float64, usage string) *subcommand {
+func (cmd *SubCMD) Float64(name, shortName string, valuePtr *float64, usage string) *SubCMD {
 	return cmd.Flag(flagFloat64, name, shortName, valuePtr, usage)
 }
 
 // Bool adds a boolean flag to the subcommand.
 // See CLI.Bool for parameter details.
 // Returns the subcommand for method chaining.
-func (cmd *subcommand) Bool(name, shortName string, valuePtr *bool, usage string) *subcommand {
+func (cmd *SubCMD) Bool(name, shortName string, valuePtr *bool, usage string) *SubCMD {
 	return cmd.Flag(flagBool, name, shortName, valuePtr, usage)
 }
 
 // Rune adds a single Unicode character flag to the subcommand.
 // See CLI.Rune for parameter details.
 // Returns the subcommand for method chaining.
-func (cmd *subcommand) Rune(name, shortName string, valuePtr *rune, usage string) *subcommand {
+func (cmd *SubCMD) Rune(name, shortName string, valuePtr *rune, usage string) *SubCMD {
 	return cmd.Flag(flagRune, name, shortName, valuePtr, usage)
 }
 
 // Duration adds a time.Duration flag to the subcommand.
 // See CLI.Duration for parameter details.
 // Returns the subcommand for method chaining.
-func (cmd *subcommand) Duration(name, shortName string, valuePtr *time.Duration, usage string) *subcommand {
+func (cmd *SubCMD) Duration(name, shortName string, valuePtr *time.Duration, usage string) *SubCMD {
 	return cmd.Flag(flagDuration, name, shortName, valuePtr, usage)
 }
 
 // StringSlice adds a string slice flag to the subcommand.
 // See CLI.StringSlice for parameter details.
 // Returns the subcommand for method chaining.
-func (cmd *subcommand) StringSlice(name, shortName string, valuePtr *[]string, usage string) *subcommand {
+func (cmd *SubCMD) StringSlice(name, shortName string, valuePtr *[]string, usage string) *SubCMD {
 	return cmd.Flag(flagStringSlice, name, shortName, valuePtr, usage)
 }
 
 // IntSlice adds an integer slice flag to the subcommand.
 // See CLI.IntSlice for parameter details.
 // Returns the subcommand for method chaining.
-func (cmd *subcommand) IntSlice(name, shortName string, valuePtr *[]int, usage string) *subcommand {
+func (cmd *SubCMD) IntSlice(name, shortName string, valuePtr *[]int, usage string) *SubCMD {
 	return cmd.Flag(flagIntSlice, name, shortName, valuePtr, usage)
 }
 
 // Time adds a time.Time flag to the subcommand.
 // See CLI.Time for parameter details.
 // Returns the subcommand for method chaining.
-func (cmd *subcommand) Time(name, shortName string, valuePtr *time.Time, usage string) *subcommand {
+func (cmd *SubCMD) Time(name, shortName string, valuePtr *time.Time, usage string) *SubCMD {
 	return cmd.Flag(flagTime, name, shortName, valuePtr, usage)
 }
 
 // IP adds an IP address flag to the subcommand.
 // See CLI.IP for parameter details.
 // Returns the subcommand for method chaining.
-func (cmd *subcommand) IP(name, shortName string, valuePtr *net.IP, usage string) *subcommand {
+func (cmd *SubCMD) IP(name, shortName string, valuePtr *net.IP, usage string) *SubCMD {
 	return cmd.Flag(flagFloat32, name, shortName, valuePtr, usage) // BUG: Should be FlagIP
 }
 
 // MAC adds a MAC address flag to the subcommand.
 // See CLI.MAC for parameter details.
 // Returns the subcommand for method chaining.
-func (cmd *subcommand) MAC(name, shortName string, valuePtr *net.HardwareAddr, usage string) *subcommand {
+func (cmd *SubCMD) MAC(name, shortName string, valuePtr *net.HardwareAddr, usage string) *SubCMD {
 	return cmd.Flag(flagMAC, name, shortName, valuePtr, usage)
 }
 
 // URL adds a URL flag to the subcommand.
 // See CLI.URL for parameter details.
 // Returns the subcommand for method chaining.
-func (cmd *subcommand) URL(name, shortName string, valuePtr *url.URL, usage string) *subcommand {
+func (cmd *SubCMD) URL(name, shortName string, valuePtr *url.URL, usage string) *SubCMD {
 	return cmd.Flag(flagURL, name, shortName, valuePtr, usage)
 }
 
 // UUID adds a UUID flag to the subcommand.
 // See CLI.UUID for parameter details.
 // Returns the subcommand for method chaining.
-func (cmd *subcommand) UUID(name, shortName string, valuePtr *uuid.UUID, usage string) *subcommand {
+func (cmd *SubCMD) UUID(name, shortName string, valuePtr *uuid.UUID, usage string) *SubCMD {
 	return cmd.Flag(flagUUID, name, shortName, valuePtr, usage)
 }
 
 // HostPortPair adds a host:port pair flag to the subcommand.
 // See CLI.HostPortPair for parameter details.
 // Returns the subcommand for method chaining.
-func (cmd *subcommand) HostPortPair(name, shortName string, valuePtr *string, usage string) *subcommand {
+func (cmd *SubCMD) HostPortPair(name, shortName string, valuePtr *string, usage string) *SubCMD {
 	return cmd.Flag(flagHostPortPair, name, shortName, valuePtr, usage)
 }
 
 // Email adds an email address flag to the subcommand.
 // See CLI.Email for parameter details.
 // Returns the subcommand for method chaining.
-func (cmd *subcommand) Email(name, shortName string, valuePtr *string, usage string) *subcommand {
+func (cmd *SubCMD) Email(name, shortName string, valuePtr *string, usage string) *SubCMD {
 	return cmd.Flag(flagEmail, name, shortName, valuePtr, usage)
 }
 
 // FilePath adds a file path flag to the subcommand.
 // See CLI.FilePath for parameter details.
 // Returns the subcommand for method chaining.
-func (cmd *subcommand) FilePath(name, shortName string, valuePtr *string, usage string) *subcommand {
+func (cmd *SubCMD) FilePath(name, shortName string, valuePtr *string, usage string) *SubCMD {
 	return cmd.Flag(flagFilePath, name, shortName, valuePtr, usage)
 }
 
 // DirPath adds a directory path flag to the subcommand.
 // See CLI.DirPath for parameter details.
 // Returns the subcommand for method chaining.
-func (cmd *subcommand) DirPath(name, shortName string, valuePtr *string, usage string) *subcommand {
+func (cmd *SubCMD) DirPath(name, shortName string, valuePtr *string, usage string) *SubCMD {
 	return cmd.Flag(flagDirPath, name, shortName, valuePtr, usage)
 }

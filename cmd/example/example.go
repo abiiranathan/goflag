@@ -67,7 +67,7 @@ func handleCors() {
 
 func main() {
 	log.SetFlags(log.Lshortfile)
-	cli := goflag.New()
+	cli := goflag.New("MyApp", "An example application using goflag")
 
 	cli.String("config", "c", &config, "Path to config file")
 	cli.Bool("verbose", "v", &verbose, "Enable verbose output")

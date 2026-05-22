@@ -6,32 +6,33 @@ import (
 	"reflect"
 )
 
-// A subcommand. It can have its own flags.
-type subcommand struct {
+// SubCMD represents a subcommand in the CLI application.
+// It contains the subcommand name, description, handler function, and associated flags.
+type SubCMD struct {
 	name        string  // Subcommand name. used as a key to find the subcommand.
 	description string  // Description of what this subcommand does.
 	Handler     func()  // Subcommand callback handler. Will be invoked by user if it matches.
 	flags       []*Flag // subcommand flags.
 }
 
-// Add validator to last flag in the subcommand chain.
-func (cmd *subcommand) Validate(validators ...FlagValidator) *subcommand {
+// Validate adds validators to the latest added flag of the subcommand.
+func (cmd *SubCMD) Validate(validators ...FlagValidator) *SubCMD {
 	if len(cmd.flags) > 0 {
 		cmd.flags[len(cmd.flags)-1].validators = append(cmd.flags[len(cmd.flags)-1].validators, validators...)
 	}
 	return cmd
 }
 
-// Sets the latest subcommand as required.
-func (cmd *subcommand) Required() *subcommand {
+// Required sets the latest added flag as required.
+func (cmd *SubCMD) Required() *SubCMD {
 	if len(cmd.flags) > 0 {
 		cmd.flags[len(cmd.flags)-1].required = true
 	}
 	return cmd
 }
 
-// Add a flag to a subcommand.
-func (cmd *subcommand) Flag(flagType flagType, name, shortName string, valuePtr any, usage string) *subcommand {
+// Flag adds a flag to the subcommand.
+func (cmd *SubCMD) Flag(flagType flagType, name, shortName string, valuePtr any, usage string) *SubCMD {
 	flag := &Flag{
 		flagType:   flagType,
 		name:       name,
@@ -46,16 +47,17 @@ func (cmd *subcommand) Flag(flagType flagType, name, shortName string, valuePtr 
 	return cmd
 }
 
-// Print help text for the subcommand.
-func (cmd *subcommand) PrintUsage(w io.Writer) {
+// PrintUsage prints the usage information for the subcommand to the provided writer.
+func (cmd *SubCMD) PrintUsage(w io.Writer) {
 	printSubCommand(cmd, w)
 }
 
-// Returns the subcommand name.
-func (cmd *subcommand) Name() string {
+// Name returns the name of the subcommand.
+func (cmd *SubCMD) Name() string {
 	return cmd.name
 }
 
+// validateFlag checks if the flag is valid. It panics if the flag is invalid.
 func validateFlag(flag *Flag) {
 	if flag == nil {
 		panic("flag can't be nil")
@@ -71,7 +73,7 @@ func validateFlag(flag *Flag) {
 	}
 
 	valueType := reflect.TypeOf(flag.value)
-	if valueType.Kind() != reflect.Ptr {
+	if valueType.Kind() != reflect.Pointer {
 		panic(fmt.Errorf("flag value for %s must be a pointer, got %s", flag.name, valueType.Kind()))
 	}
 }

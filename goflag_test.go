@@ -8,14 +8,14 @@ import (
 )
 
 func TestParse(t *testing.T) {
-	cli := New()
+	cli := New("test", "My test app")
 	var (
-		name   string = "World"
-		age    int    = 20
-		height int    = 0
+		name   = "World"
+		age    = 20
+		height = 0
 	)
 
-	cli.subcommands = []*subcommand{
+	cli.subcommands = []*SubCMD{
 		{
 			name:        "test",
 			description: "Test command",
@@ -150,7 +150,7 @@ func TestParse(t *testing.T) {
 }
 
 func TestAddCommand(t *testing.T) {
-	cli := New()
+	cli := New("test", "My test app")
 	var name string
 	cli.SubCommand("test", "Test command", func() {
 		fmt.Println("Test command")
@@ -198,7 +198,7 @@ func TestPrintUsage(t *testing.T) {
 				usage:     "Age of the person",
 			},
 		},
-		subcommands: []*subcommand{
+		subcommands: []*SubCMD{
 			{
 				name:        "add",
 				description: "Add a new person",
@@ -270,7 +270,7 @@ func TestPrintUsage(t *testing.T) {
 }
 
 func TestAddFlag(t *testing.T) {
-	cli := New()
+	cli := New("test", "My test app")
 	var name string
 
 	cli.addFlag(flagString, "name", "n", &name, "Your name").Required()
@@ -290,7 +290,7 @@ func TestAddFlag(t *testing.T) {
 
 func TestGlobalRequiredFlags(t *testing.T) {
 	// test global required flag
-	cli := New()
+	cli := New("test", "My test app")
 
 	var verbose bool
 	var port int

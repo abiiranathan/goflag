@@ -54,7 +54,7 @@ type Flag struct {
 	validators []FlagValidator
 }
 
-// Add validator to last flag in the subcommand chain. If no flag exists, it panics.
+// Validate adds validator to last flag in the subcommand chain.
 func (flag *Flag) Validate(validators ...FlagValidator) *Flag {
 	flag.validators = append(flag.validators, validators...)
 	return flag
@@ -65,18 +65,23 @@ func (flag *Flag) Required() *Flag {
 	return flag
 }
 
-// Global flag context. Stores global flags and subcommands.
+// CLI is the Global flag context. Stores global flags and subcommands.
 type CLI struct {
-	flags       []*Flag
-	subcommands []*subcommand
+	name, description string
+	flags             []*Flag
+	subcommands       []*SubCMD
 }
 
 // The completion subcommand.
-var completionCmd *subcommand
+var completionCmd *SubCMD
 
-// Create a new command-line interface.
-func New() *CLI {
+// New create a new command-line interface.
+// name is the program name. description is the program description.
+// Both are used during help display.
+func New(name, description string) *CLI {
 	cli := &CLI{
+		name:        name,
+		description: description,
 		flags: []*Flag{
 			{name: "help", shortName: "h", flagType: flagBool, usage: "Print help message and exit"},
 		},
@@ -134,8 +139,8 @@ func (c *CLI) addFlag(flagType flagType, name, shortName string, valuePtr any, u
 	return flag
 }
 
-// Add a subcommand to the command-line context.
-func (c *CLI) SubCommand(name, description string, handler func()) *subcommand {
+// SubCommand adds a subcommand to the command-line context.
+func (c *CLI) SubCommand(name, description string, handler func()) *SubCMD {
 	if handler == nil {
 		panic("subcommand can not be registered with nil handler")
 	}
@@ -147,7 +152,7 @@ func (c *CLI) SubCommand(name, description string, handler func()) *subcommand {
 		panic("subcommand description can't be empty")
 	}
 
-	cmd := &subcommand{
+	cmd := &SubCMD{
 		name:        name,
 		description: description,
 		Handler:     handler,
@@ -165,9 +170,10 @@ func (c *CLI) SubCommand(name, description string, handler func()) *subcommand {
 // The first argument is ignored as it is the program name.
 //
 // Populates the values of the flags and also finds the matching subcommand.
-// Returns the matching subcommand.
-func (c *CLI) Parse(argv []string) (*subcommand, error) {
-	var subcmd *subcommand = nil
+// Returns the matching subcommand if found, or nil if no subcommand is found.
+// Returns an error if there is a problem with the flags.
+func (c *CLI) Parse(argv []string) (*SubCMD, error) {
+	var subcmd *SubCMD = nil
 	subCommandIndex := -1
 
 	// store processed flags.
@@ -315,6 +321,27 @@ func (c *CLI) Parse(argv []string) (*subcommand, error) {
 	return subcmd, nil
 }
 
+// ParseAndInvoke is a helper that calls Parse and then invokes the subcommand handler if a subcommand is found.
+// If a preInvokeCallback function is provided, it is called with the matching subcommand before invoking the handler.
+// The preInvokeCallback can be used to perform any setup or initialization before the handler is called.
+// Forexample it can be used to connect to a database or initialize a logger before the handler is called.
+func (c *CLI) ParseAndInvoke(argv []string, preInvokeCallback func()) error {
+	subcmd, err := c.Parse(argv)
+	if err != nil {
+		return err
+	}
+
+	if subcmd != nil {
+		if preInvokeCallback != nil {
+			preInvokeCallback()
+		}
+
+		// invoke the subcommand handler. (Cannot be nil because it is checked in SubCommand method.)
+		subcmd.Handler()
+	}
+	return nil
+}
+
 // Helper to Parse the flags.
 // flags: The flags to parse.
 // name: The name of the flag, may be the short name.
@@ -412,7 +439,7 @@ func isHelpFlag(name string) bool {
 
 // Print a subcommand to the writer.
 // Called by PrintUsage for each subcommand.
-func printSubCommand(cmd *subcommand, w io.Writer) {
+func printSubCommand(cmd *SubCMD, w io.Writer) {
 	fmt.Fprintf(w, "%s: %s", cmd.name, cmd.description)
 	fmt.Fprintln(w)
 
@@ -437,13 +464,7 @@ func printSubCommand(cmd *subcommand, w io.Writer) {
 	fmt.Fprintln(w)
 }
 
-// Print the usage to the writer.
-// Called by Parse if the help flag is present.
-// help flag is automatically added to the context.
-// May be called as help, --help, -h, --h
-//
-// Help for a given subcommand can be printed by passing the subcommand name as the
-// glag --subcommand or -c. e.g. --help -c greet
+// PrintUsage prints the usage message to the writer.
 func (c *CLI) PrintUsage(w io.Writer) {
 	longestFlagName := 0
 	for _, flag := range c.flags {
@@ -460,7 +481,16 @@ func (c *CLI) PrintUsage(w io.Writer) {
 		}
 	}
 
-	fmt.Fprintf(w, "Usage: %s [global flags] [subcommand] [subcommand flags]\n", os.Args[0])
+	programName := c.name
+	if programName == "" {
+		programName = os.Args[0]
+	}
+
+	fmt.Fprintf(w, "Usage: %s [global flags] [subcommand] [subcommand flags]\n", programName)
+	if c.description != "" {
+		fmt.Fprintf(w, "%s\n", c.description)
+	}
+
 	// print the global flags.
 	fmt.Fprintf(w, "Global Flags:\n")
 	for _, flag := range c.flags {
