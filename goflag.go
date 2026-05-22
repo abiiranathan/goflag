@@ -325,7 +325,7 @@ func (c *CLI) Parse(argv []string) (*SubCMD, error) {
 // If a preInvokeCallback function is provided, it is called with the matching subcommand before invoking the handler.
 // The preInvokeCallback can be used to perform any setup or initialization before the handler is called.
 // Forexample it can be used to connect to a database or initialize a logger before the handler is called.
-func (c *CLI) ParseAndInvoke(argv []string, preInvokeCallback func()) error {
+func (c *CLI) ParseAndInvoke(argv []string, config any, preInvokeCallback func(cmd *SubCMD, config any)) error {
 	subcmd, err := c.Parse(argv)
 	if err != nil {
 		return err
@@ -333,7 +333,7 @@ func (c *CLI) ParseAndInvoke(argv []string, preInvokeCallback func()) error {
 
 	if subcmd != nil {
 		if preInvokeCallback != nil {
-			preInvokeCallback()
+			preInvokeCallback(subcmd, config)
 		}
 
 		// invoke the subcommand handler. (Cannot be nil because it is checked in SubCommand method.)
