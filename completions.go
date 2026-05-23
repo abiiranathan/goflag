@@ -120,13 +120,15 @@ func writeBashSubCommandCase(w io.Writer, cmd *SubCMD, indent string) {
 		fmt.Fprintf(w, "%sif [[ -z \"$nested_ctx\" ]]; then\n", inner)
 	}
 
+	effectiveFlags := buildEffectiveFlags(cmd)
+
 	// Flags that need an argument at this level.
 	fmt.Fprintf(w, "%scase \"$prev\" in\n", inner)
-	writeBashFlagCases(w, cmd.flags, inner+"    ")
+	writeBashFlagCases(w, effectiveFlags, inner+"    ")
 	fmt.Fprintf(w, "%sesac\n", inner)
 
 	var subFlags []string
-	for _, f := range cmd.flags {
+	for _, f := range effectiveFlags {
 		subFlags = append(subFlags, "--"+f.name)
 	}
 	allCompletions := strings.Join(append(subFlags, childNames...), " ")
@@ -229,6 +231,8 @@ func writeZshSubCommandCase(w io.Writer, cmd *SubCMD, indent string) {
 	fmt.Fprintf(w, "%s%s)\n", indent, cmd.name)
 	inner := indent + "    "
 
+	effectiveFlags := buildEffectiveFlags(cmd)
+
 	if len(cmd.subcommands) > 0 {
 		// Emit a nested subcommand array and recurse.
 		fmt.Fprintf(w, "%slocal -a nested_cmds\n", inner)
@@ -240,7 +244,7 @@ func writeZshSubCommandCase(w io.Writer, cmd *SubCMD, indent string) {
 		fmt.Fprintf(w, "%s)\n", inner)
 
 		fmt.Fprintf(w, "%s_arguments -C \\\n", inner)
-		for _, f := range cmd.flags {
+		for _, f := range effectiveFlags {
 			writeZshFlagSpec(w, f, inner+"    ")
 			fmt.Fprintf(w, " \\\n")
 		}
@@ -260,7 +264,7 @@ func writeZshSubCommandCase(w io.Writer, cmd *SubCMD, indent string) {
 	} else {
 		// Leaf subcommand — emit its flags directly.
 		fmt.Fprintf(w, "%s_arguments -C \\\n", inner)
-		for _, f := range cmd.flags {
+		for _, f := range effectiveFlags {
 			writeZshFlagSpec(w, f, inner+"    ")
 			fmt.Fprintf(w, " \\\n")
 		}

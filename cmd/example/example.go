@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -50,29 +51,39 @@ var (
 	userAge  int
 	botName  string
 	botDelay time.Duration
+
+	// Persistent flag shared across all "deploy" sub-subcommands.
+	deployEnv string
+
+	// Mutually exclusive export flags.
+	exportJSON bool
+	exportYAML bool
 )
 
-func greetUser(userdata any) {
+func greetUser(userdata any) error {
 	cfg, _ := userdata.(*AppConfig)
 	if cfg != nil && cfg.Debug {
 		fmt.Println("[debug] greet user handler running")
 	}
 	fmt.Println(greeting, name)
+	return nil
 }
 
-func greetUserSub(userdata any) {
+func greetUserSub(userdata any) error {
 	cfg, _ := userdata.(*AppConfig)
 	if cfg != nil && cfg.Debug {
 		fmt.Printf("[debug] DB: %s\n", cfg.DBConnStr)
 	}
 	fmt.Printf("Greeting user: %s (age %d)\n", userName, userAge)
+	return nil
 }
 
-func greetBotSub(userdata any) {
+func greetBotSub(userdata any) error {
 	fmt.Printf("Greeting bot: %s (delay: %v)\n", botName, botDelay)
+	return nil
 }
 
-func printVersion(userdata any) {
+func printVersion(userdata any) error {
 	if short {
 		fmt.Println("1.0.0")
 	} else {
@@ -80,18 +91,51 @@ func printVersion(userdata any) {
 		fmt.Println("Build Date: 2021-01-01")
 		fmt.Println("Commit: 1234567890")
 	}
+	return nil
 }
 
-func handleSleep(userdata any) {
+func handleSleep(userdata any) error {
 	fmt.Printf("Sleeping for %v...\n", durationValue)
 	time.Sleep(durationValue)
+	return nil
 }
 
-func handleCors(userdata any) {
+func handleCors(userdata any) error {
 	fmt.Println("Origins:", origins)
 	fmt.Println("Methods:", methods)
 	fmt.Println("Headers:", headers)
 	fmt.Println("Credentials:", credentials)
+	return nil
+}
+
+// handleDeployStaging demonstrates reading a persistent flag (deployEnv) that
+// was declared on the parent "deploy" subcommand.
+func handleDeployStaging(userdata any) error {
+	if deployEnv == "" {
+		// Feature 2 in action: return a real error instead of calling log.Fatal.
+		return errors.New("--env is required for staging deployments")
+	}
+	fmt.Printf("Deploying to staging (env=%s)\n", deployEnv)
+	return nil
+}
+
+func handleDeployProd(userdata any) error {
+	fmt.Printf("Deploying to production (env=%s)\n", deployEnv)
+	return nil
+}
+
+func handleExport(userdata any) error {
+	// Feature 3 makes the CLI reject --json + --yaml together; by the time
+	// this handler runs, exactly one (or neither) is set.
+	switch {
+	case exportJSON:
+		fmt.Println("Exporting as JSON")
+	case exportYAML:
+		fmt.Println("Exporting as YAML")
+	default:
+		fmt.Println("Exporting in default format")
+	}
+	return nil
 }
 
 func main() {
@@ -142,27 +186,44 @@ func main() {
 		StringSlice("headers", "d", &headers, "Allowed headers").Required().
 		Bool("credentials", "c", &credentials, "Allow credentials")
 
+	// Persistent flags: --env is declared once on "deploy" and
+	// automatically available to both "staging" and "prod" sub-subcommands.
+	deployCmd := cli.SubCommand("deploy", "Deploy the application", func(userdata any) error {
+		fmt.Println("specify a sub-subcommand: staging or prod")
+		return nil
+	})
+	deployCmd.PersistentString("env", "e", &deployEnv, "Target environment (e.g. production)")
+
+	deployCmd.SubCommand("staging", "Deploy to staging", handleDeployStaging)
+	deployCmd.SubCommand("prod", "Deploy to production", handleDeployProd)
+
+	// Mutually exclusive flags: --json and --yaml cannot both be
+	// provided. The parser enforces this before the handler is called.
+	cli.SubCommand("export", "Export data", handleExport).
+		Bool("json", "j", &exportJSON, "Output as JSON").
+		Bool("yaml", "y", &exportYAML, "Output as YAML").
+		ExclusiveFlags("json", "yaml")
+
 	// Thread application config as userdata.
 	appCfg := &AppConfig{
 		DBConnStr: "postgres://localhost/mydb",
 		Debug:     verbose,
 	}
 
-	subcmd, err := cli.Parse(os.Args)
+	// Feature 2 — ParseAndInvoke now propagates handler errors.
+	err := cli.ParseAndInvoke(os.Args, appCfg, func(cmd *goflag.SubCMD, userdata any) {
+		if cmd == nil {
+			return
+		}
+		if args := cmd.Args(); len(args) > 0 {
+			fmt.Println("Positional args:", args)
+		}
+	})
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	if subcmd != nil {
-		// Positional arguments are available on the matched subcommand.
-		if args := subcmd.Args(); len(args) > 0 {
-			fmt.Println("Positional args:", args)
-		}
-		subcmd.Handler(appCfg)
-		os.Exit(0)
-	}
-
-	// Positional arguments at the root level.
+	// Reached only when no subcommand was matched.
 	if args := cli.Args(); len(args) > 0 {
 		fmt.Println("Root positional args:", args)
 	}
