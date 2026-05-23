@@ -322,21 +322,21 @@ func (c *CLI) Parse(argv []string) (*SubCMD, error) {
 }
 
 // ParseAndInvoke is a helper that calls Parse and then invokes the subcommand handler if a subcommand is found.
-// If a preInvokeCallback function is provided, it is called with the matching subcommand before invoking the handler.
+// If a preInvokeCallback function is provided, it is called with the matching subcommand
+// before invoking the handler. Note that it the subcommand is nil if no subcommand is invoked.
 // The preInvokeCallback can be used to perform any setup or initialization before the handler is called.
-// Forexample it can be used to connect to a database or initialize a logger before the handler is called.
-func (c *CLI) ParseAndInvoke(argv []string, config any, preInvokeCallback func(cmd *SubCMD, config any)) error {
+// Forexample it can be used to connect to a database or initialize a logger.
+func (c *CLI) ParseAndInvoke(argv []string, config any, preInvokeCallback func(cmd *SubCMD, userdata any)) error {
 	subcmd, err := c.Parse(argv)
 	if err != nil {
 		return err
 	}
 
-	if subcmd != nil {
-		if preInvokeCallback != nil {
-			preInvokeCallback(subcmd, config)
-		}
+	if preInvokeCallback != nil {
+		preInvokeCallback(subcmd, config)
+	}
 
-		// invoke the subcommand handler. (Cannot be nil because it is checked in SubCommand method.)
+	if subcmd != nil && subcmd.Handler != nil {
 		subcmd.Handler()
 	}
 	return nil
