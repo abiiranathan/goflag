@@ -32,4 +32,4 @@ go run ./cmd/example/example.go -config configfile.yaml \
     --timeout 10s \
     --port 8080 \
     sleep \
-    --time 4
+    --time 1s

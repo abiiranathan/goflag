@@ -1,6 +1,17 @@
-// A simple flag package for go.
-// Support for --flag value and -flag values.
-// Built in subcommand support and flag validation.
+// Package goflag provides a simple, type-safe command-line flag parsing library
+// with support for arbitrarily nested subcommands, required-flag validation,
+// per-flag validators, and shell completion generation.
+//
+// # Quick start
+//
+//	cli := goflag.New("myapp", "Does something useful")
+//	cli.String("config", "c", &cfg, "Path to config file").Required()
+//	cli.Bool("verbose", "v", &verbose, "Verbose output")
+//
+//	subcmd, err := cli.Parse(os.Args)
+//	if err != nil { log.Fatal(err) }
+//	if subcmd != nil { subcmd.Handler(nil) }
+//
 // Author: Dr. Abiira Nathan.
 // Date: Sept 25. 2023
 // License: MIT License
@@ -41,43 +52,60 @@ const (
 	flagDirPath
 )
 
+// FlagValidator is a user-supplied validation function called after a flag's
+// value has been parsed. It receives the concrete (dereferenced) value and
+// must return (true, "") on success or (false, errorMessage) on failure.
 type FlagValidator func(value any) (valid bool, errmsg string)
 
-// A Flag as parsed from the command line.
+// Flag represents a single command-line flag with its type, names, default
+// value pointer, usage string, and optional validators.
 type Flag struct {
 	flagType   flagType
-	name       string
-	shortName  string
-	value      any // pointer to default value. Will be populated by Parse.
-	usage      string
-	required   bool
-	validators []FlagValidator
+	name       string          // Long flag name (--name).
+	shortName  string          // Short flag name (-n); may be empty.
+	value      any             // Pointer to the caller-supplied variable.
+	usage      string          // Description shown in help output.
+	required   bool            // Whether absence of this flag is an error.
+	validators []FlagValidator // Run in order after parsing; first failure wins.
 }
 
-// Validate adds validator to last flag in the subcommand chain.
+// Validate appends validators to the flag and returns the flag for chaining.
 func (flag *Flag) Validate(validators ...FlagValidator) *Flag {
 	flag.validators = append(flag.validators, validators...)
 	return flag
 }
 
+// Required marks the flag as mandatory and returns it for chaining.
 func (flag *Flag) Required() *Flag {
 	flag.required = true
 	return flag
 }
 
-// CLI is the Global flag context. Stores global flags and subcommands.
+// CLI is the root command-line context. It owns global flags, top-level
+// subcommands, and the positional arguments that remain after parsing.
+//
+// Not safe for concurrent use.
 type CLI struct {
-	name, description string
-	flags             []*Flag
-	subcommands       []*SubCMD
+	name        string    // Program name shown in help output.
+	description string    // Program description shown in help output.
+	flags       []*Flag   // Global (root-level) flags.
+	subcommands []*SubCMD // Top-level subcommands.
+	args        []string  // Positional arguments captured at the root level.
 }
 
-// The completion subcommand.
+// Args returns the positional arguments collected at the root level during
+// the most recent Parse call.
+func (c *CLI) Args() []string {
+	return c.args
+}
+
+// completionCmd is the auto-registered completion subcommand. It is kept as a
+// package-level variable so that Parse can skip required-flag checks for it.
 var completionCmd *SubCMD
 
-// New create a new command-line interface.
-// name is the program name. description is the program description.
-// Both are used during help display.
+// New creates a new CLI with the given program name and description. A
+// "completion" subcommand is automatically registered that can generate and
+// install bash/zsh completion scripts.
 func New(name, description string) *CLI {
 	cli := &CLI{
 		name:        name,
@@ -87,145 +115,179 @@ func New(name, description string) *CLI {
 		},
 	}
 
-	// Add completion subcommand for all CLIs
+	// Completion subcommand — registered before the caller adds anything so
+	// that it is always present. Variables are captured by closure.
 	var shell string
 	var install bool
 	var uninstall bool
 
-	completionCmd = cli.SubCommand("completion", "Generate shell completion scripts", func() {
-		// Check for conflicting flags
-		if install && uninstall {
-			log.Fatal("Error: cannot use --install and --uninstall together\n")
-		}
-
-		if uninstall {
-			// Uninstall the completion script
-			if err := cli.UninstallCompletion(shell); err != nil {
-				log.Fatalf("Failed to uninstall completion: %v\n", err)
+	completionCmd = cli.subCommand(name, description, "completion", "Generate shell completion scripts",
+		func(userdata any) {
+			if install && uninstall {
+				log.Fatal("error: cannot use --install and --uninstall together")
 			}
-		} else if install {
-			cli.InstallCompletion(shell)
-		} else {
-			// Just print to stdout
+
+			if uninstall {
+				if err := cli.UninstallCompletion(shell); err != nil {
+					log.Fatalf("failed to uninstall completion: %v\n", err)
+				}
+				return
+			}
+
+			if install {
+				if err := cli.InstallCompletion(shell); err != nil {
+					log.Fatalf("failed to install completion: %v\n", err)
+				}
+				return
+			}
+
 			switch shell {
 			case "bash":
 				cli.GenBashCompletion(os.Stdout)
 			case "zsh":
 				cli.GenZshCompletion(os.Stdout)
 			default:
-				log.Fatalf("Unsupported shell: %s\n", shell)
+				log.Fatalf("unsupported shell: %s\n", shell)
 			}
-		}
-	}).
-		String("shell", "s", &shell, "The shell to generate completions for [bash|zsh]").
+		},
+	)
+
+	// Attach the completion subcommand's own flags via the low-level method
+	// so chaining returns *SubCMD (Required/Validate apply to last flag).
+	completionCmd.
+		Flag(flagString, "shell", "s", &shell, "The shell to generate completions for [bash|zsh]").
 		Required().Validate(Choices([]string{"zsh", "bash"})).
-		Bool("install", "i", &install, "Install the completion script to the appropriate location").
-		Bool("uninstall", "u", &uninstall, "Uninstall the completion script")
+		Flag(flagBool, "install", "i", &install, "Install the completion script").
+		Flag(flagBool, "uninstall", "u", &uninstall, "Uninstall the completion script")
+
 	return cli
 }
 
-// Add a flag to the context.
-func (c *CLI) addFlag(flagType flagType, name, shortName string, valuePtr any, usage string) *Flag {
-	flag := &Flag{
-		flagType:  flagType,
+// subCommand is the internal constructor shared by CLI and SubCMD registration
+// paths. It builds the child and appends it to cli.subcommands; for SubCMD
+// nesting the caller sets child.parent afterward.
+func (c *CLI) subCommand(
+	_ /* programName */, _ /* programDesc */ string,
+	name, description string,
+	handler func(userdata any),
+) *SubCMD {
+	child := &SubCMD{
+		name:        name,
+		description: description,
+		Handler:     handler,
+		flags: []*Flag{
+			{name: "help", shortName: "h", flagType: flagBool, usage: "Print help message and exit"},
+		},
+	}
+	c.subcommands = append(c.subcommands, child)
+	return child
+}
+
+// addFlag creates a Flag and appends it to the CLI's global flag list.
+func (c *CLI) addFlag(ft flagType, name, shortName string, valuePtr any, usage string) *Flag {
+	f := &Flag{
+		flagType:  ft,
 		name:      name,
 		shortName: shortName,
 		value:     valuePtr,
 		usage:     usage,
 	}
-
-	validateFlag(flag)
-	c.flags = append(c.flags, flag)
-	return flag
+	validateFlag(f)
+	c.flags = append(c.flags, f)
+	return f
 }
 
-// SubCommand adds a subcommand to the command-line context.
-func (c *CLI) SubCommand(name, description string, handler func()) *SubCMD {
+// SubCommand registers a top-level subcommand and returns it for flag
+// configuration via method chaining.
+//
+// Panics if name or description is empty, or if handler is nil.
+func (c *CLI) SubCommand(name, description string, handler func(userdata any)) *SubCMD {
 	if handler == nil {
-		panic("subcommand can not be registered with nil handler")
+		panic("subcommand cannot be registered with a nil handler")
 	}
-
 	if name == "" {
-		panic("subcommand name can't be empty")
+		panic("subcommand name cannot be empty")
 	}
 	if description == "" {
-		panic("subcommand description can't be empty")
+		panic("subcommand description cannot be empty")
 	}
-
-	cmd := &SubCMD{
-		name:        name,
-		description: description,
-		Handler:     handler,
-		flags: []*Flag{
-			{name: "help", shortName: "h", flagType: flagString, usage: "Print help message and exit"},
-		},
-	}
-	c.subcommands = append(c.subcommands, cmd)
-
-	// add the help flag to the subcommand.
-	return cmd
+	return c.subCommand("", "", name, description, handler)
 }
 
-// Parse the flags and subcommands. args should be os.Args.
-// The first argument is ignored as it is the program name.
+// Parse tokenises argv (pass os.Args), populates flag variables, and returns
+// the deepest matching SubCMD in the subcommand tree. Positional arguments are
+// stored on the matched SubCMD (or on the CLI itself when no subcommand
+// matched). Returns nil, nil when no subcommand was found and no error
+// occurred.
 //
-// Populates the values of the flags and also finds the matching subcommand.
-// Returns the matching subcommand if found, or nil if no subcommand is found.
-// Returns an error if there is a problem with the flags.
+// The first element of argv is assumed to be the program name and is skipped.
 func (c *CLI) Parse(argv []string) (*SubCMD, error) {
-	var subcmd *SubCMD = nil
-	subCommandIndex := -1
+	if len(argv) >= 1 {
+		argv = argv[1:] // drop program name
+	}
 
-	// store processed flags.
-	processedGlobalFlags := make(map[string]bool)
-	processedSubCommandFlags := make(map[string]bool)
+	var positional []string
+	processed := make(map[string]bool)
 
-	if len(argv) >= 2 {
-		// skip the first argument which is the program name.
-		argv = argv[1:]
+	subcmd, remaining, err := c.parseLevel(argv, c.flags, c.subcommands, processed, &positional)
+	if err != nil {
+		return nil, err
+	}
 
-		// First pass, consume global flags.
-	outerloop:
-		for i := 0; i < len(argv); i++ {
-			arg := argv[i]
-
-			if strings.TrimSpace(arg) == "" {
-				continue
+	if subcmd == nil {
+		// No subcommand matched — check global required flags, store positional args.
+		for _, f := range c.flags {
+			if f.required && !processed[f.name] {
+				return nil, fmt.Errorf("missing required flag [-%s | --%s]", f.shortName, f.name)
 			}
+		}
+		c.args = positional
+		return nil, nil
+	}
 
-			// Check for = in the arg. If present, split the arg into two.
-			// The first part is the flag name and the second part is the value.
-			// e.g. --name=John
-			if strings.Contains(arg, "=") {
-				parts := strings.Split(arg, "=")       // split the arg into two.
-				arg = parts[0]                         // the first part is the flag name.
-				argv = append(argv[:i+1], argv[i:]...) // insert the second part into the argv.
-				argv[i+1] = parts[1]                   // set the second part as the next arg.
+	// Recurse into the matched subcommand tree with the remaining tokens.
+	leaf, err := c.parseSubCommandTree(subcmd, remaining)
+	if err != nil {
+		return nil, err
+	}
+	return leaf, nil
+}
 
-			}
+// parseLevel scans tokens and dispatches them as global flags, subcommand
+// names, or positional arguments. It returns the first subcommand token that
+// matches, along with the tokens that follow it.
+func (c *CLI) parseLevel(
+	argv []string,
+	flags []*Flag,
+	subcommands []*SubCMD,
+	processed map[string]bool,
+	positional *[]string,
+) (*SubCMD, []string, error) {
 
+	for i := 0; i < len(argv); i++ {
+		arg := argv[i]
+
+		if strings.TrimSpace(arg) == "" {
+			continue
+		}
+
+		// Expand --key=value into two tokens in-place.
+		if strings.Contains(arg, "=") {
+			parts := strings.SplitN(arg, "=", 2)
+			arg = parts[0]
+			// Insert the value token right after the current position.
+			tail := make([]string, len(argv[i+1:]))
+			copy(tail, argv[i+1:])
+			argv = append(argv[:i+1], append([]string{parts[1]}, tail...)...)
+		}
+
+		if len(arg) > 1 && arg[0] == '-' {
+			// Flag token.
 			var name string
-
-			if arg[0] == '-' && arg[1] == '-' {
-				// long flag
-				name = arg[2:]
-			} else if arg[0] == '-' {
-				// short flag
-				name = arg[1:]
+			if len(arg) > 2 && arg[1] == '-' {
+				name = arg[2:] // --long
 			} else {
-				if len(c.subcommands) == 0 {
-					continue
-				}
-
-				// subcommand or flag value.
-				for _, cmd := range c.subcommands {
-					if cmd.name == arg {
-						subcmd = cmd
-						subCommandIndex = i
-						break outerloop
-					}
-				}
-				continue // value will be consumed by looking at the next arg.
+				name = arg[1:] // -s
 			}
 
 			if isHelpFlag(name) {
@@ -233,177 +295,222 @@ func (c *CLI) Parse(argv []string) (*SubCMD, error) {
 				os.Exit(0)
 			}
 
-			flag, err := parseFlags(&c.flags, name, i, argv)
+			f, err := parseFlags(&flags, name, i, argv)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
+			if f != nil {
+				processed[f.name] = true
+			}
+			continue
+		}
 
-			if flag != nil {
-				// Store the processed flag.
-				// This is used to check if all required global flags are present.
-				processedGlobalFlags[flag.name] = true
+		// Non-flag token: try to match a subcommand.
+		for _, cmd := range subcommands {
+			if cmd.name == arg {
+				return cmd, argv[i+1:], nil
+			}
+		}
+
+		// Not a subcommand — treat as positional argument.
+		*positional = append(*positional, arg)
+	}
+
+	return nil, nil, nil
+}
+
+// parseSubCommandTree recursively parses flags and nested subcommands for cmd,
+// returning the deepest matched subcommand (the "leaf").
+func (c *CLI) parseSubCommandTree(cmd *SubCMD, argv []string) (*SubCMD, error) {
+	processed := make(map[string]bool)
+	var positional []string
+
+	// Reset positional args from any previous parse.
+	cmd.args = nil
+
+	nested, remaining, err := c.parseSubLevel(cmd, argv, processed, &positional)
+	if err != nil {
+		return nil, err
+	}
+
+	// Skip required-flag validation for the built-in completion subcommand.
+	if cmd != completionCmd {
+		for _, f := range cmd.flags {
+			if f.required && !processed[f.name] {
+				return nil, fmt.Errorf("missing required flag [-%s | --%s]", f.shortName, f.name)
 			}
 		}
 	}
 
-	// check if all required global flags are present.
-	// Done after parsing the subcommand flags so that the subcommand help can be printed.
-	// if the global flags are missing.
-	if subcmd != completionCmd {
-		for _, flag := range c.flags {
-			if _, found := processedGlobalFlags[flag.name]; !found && flag.required {
-				return nil, fmt.Errorf("missing required flag [-%s | --%s]", flag.shortName, flag.name)
-			}
-		}
+	if nested == nil {
+		// This is the leaf node.
+		cmd.args = positional
+		return cmd, nil
 	}
 
-	// Second pass, consume subcommand flags.
-	if subcmd == nil {
-		return nil, nil
-	}
+	// Recurse into the nested subcommand.
+	return c.parseSubCommandTree(nested, remaining)
+}
 
-	// remove the subcommand from the argv.
-	subCommandIndex++
+// parseSubLevel is the per-SubCMD token scanner; mirrors parseLevel but
+// operates on the subcommand's own flag set and child subcommands.
+func (c *CLI) parseSubLevel(
+	cmd *SubCMD,
+	argv []string,
+	processed map[string]bool,
+	positional *[]string,
+) (*SubCMD, []string, error) {
 
-	// parse the subcommand flags.
-	for i := subCommandIndex; i < len(argv); i++ {
+	for i := 0; i < len(argv); i++ {
 		arg := argv[i]
+
 		if strings.TrimSpace(arg) == "" {
 			continue
 		}
 
-		// Check for = in the arg. If present, split the arg into two.
-		// The first part is the flag name and the second part is the value.
-		// e.g. --name=John
 		if strings.Contains(arg, "=") {
-			parts := strings.Split(arg, "=")       // split the arg into two.
-			arg = parts[0]                         // the first part is the flag name.
-			argv = append(argv[:i+1], argv[i:]...) // insert the second part into the argv.
-			argv[i+1] = parts[1]                   // set the second part as the next arg.
+			parts := strings.SplitN(arg, "=", 2)
+			arg = parts[0]
+			tail := make([]string, len(argv[i+1:]))
+			copy(tail, argv[i+1:])
+			argv = append(argv[:i+1], append([]string{parts[1]}, tail...)...)
 		}
 
-		var name string
-		if arg[0] == '-' && arg[1] == '-' {
-			// long flag
-			name = arg[2:]
-		} else if arg[0] == '-' {
-			// short flag
-			name = arg[1:]
-		} else {
+		if len(arg) > 1 && arg[0] == '-' {
+			var name string
+			if len(arg) > 2 && arg[1] == '-' {
+				name = arg[2:]
+			} else {
+				name = arg[1:]
+			}
+
+			if isHelpFlag(name) {
+				cmd.PrintUsage(os.Stdout)
+				os.Exit(0)
+			}
+
+			f, err := parseFlags(&cmd.flags, name, i, argv)
+			if err != nil {
+				return nil, nil, err
+			}
+
+			if f != nil {
+				processed[f.name] = true
+				if f.flagType != flagBool {
+					i++ // skip the value token already consumed by parseFlags
+				}
+			}
 			continue
-			// flag value. will be consumed by looking at the next arg.
 		}
 
-		if isHelpFlag(name) {
-			subcmd.PrintUsage(os.Stdout)
-			os.Exit(0)
+		// Try to match a nested subcommand.
+		for _, child := range cmd.subcommands {
+			if child.name == arg {
+				return child, argv[i+1:], nil
+			}
 		}
 
-		flag, err := parseFlags(&subcmd.flags, name, i, argv)
-		if err != nil {
-			return nil, err
-		}
-
-		if flag != nil {
-			// Store the processed flag.
-			// This is used to check if all required subcommand flags are present.
-			processedSubCommandFlags[flag.name] = true
-		}
+		// Positional argument.
+		*positional = append(*positional, arg)
 	}
 
-	// check if all required subcommand flags are present.
-	for _, flag := range subcmd.flags {
-		if _, found := processedSubCommandFlags[flag.name]; !found && flag.required {
-			return nil, fmt.Errorf("missing required flag [-%s | --%s]", flag.shortName, flag.name)
-		}
-	}
-
-	return subcmd, nil
+	return nil, nil, nil
 }
 
-// ParseAndInvoke is a helper that calls Parse and then invokes the subcommand handler if a subcommand is found.
-// If a preInvokeCallback function is provided, it is called with the matching subcommand
-// before invoking the handler. Note that it the subcommand is nil if no subcommand is invoked.
-// The preInvokeCallback can be used to perform any setup or initialization before the handler is called.
-// Forexample it can be used to connect to a database or initialize a logger.
-func (c *CLI) ParseAndInvoke(argv []string, config any, preInvokeCallback func(cmd *SubCMD, userdata any)) error {
+// ParseAndInvoke is a convenience wrapper around Parse that immediately calls
+// the matched subcommand's Handler, passing userdata through to it. If a
+// preInvokeCallback is provided it is called with the matched subcommand (which
+// may be nil) and userdata before the handler runs.
+//
+// Returns any error from Parse; handler errors must be communicated through
+// userdata or side-channels.
+func (c *CLI) ParseAndInvoke(argv []string, userdata any, preInvokeCallback func(cmd *SubCMD, userdata any)) error {
 	subcmd, err := c.Parse(argv)
 	if err != nil {
 		return err
 	}
 
 	if preInvokeCallback != nil {
-		preInvokeCallback(subcmd, config)
+		preInvokeCallback(subcmd, userdata)
 	}
 
 	if subcmd != nil && subcmd.Handler != nil {
-		subcmd.Handler()
+		subcmd.Handler(userdata)
 	}
 	return nil
 }
 
-// Helper to Parse the flags.
-// flags: The flags to parse.
-// name: The name of the flag, may be the short name.
-// i: The index of the flag in the argv.
-// argv: The arguments.
+// parseFlags locates the named flag in the provided slice, reads its value
+// from argv[i+1] when required, runs validators, and returns the flag.
 func parseFlags(flags *[]*Flag, name string, i int, argv []string) (*Flag, error) {
-	flag := findFlag(*flags, name)
-	if flag == nil {
-		return nil, fmt.Errorf("unknown flag : %s", name)
+	f := findFlag(*flags, name)
+	if f == nil {
+		return nil, fmt.Errorf("unknown flag: %s", name)
 	}
 
-	// look at the next arg for the value.
 	valueIndex := i + 1
-	if (valueIndex) >= len(argv) {
-		if flag.flagType == flagBool { // bool falg may have no value associated. e.g. --verbose
-			*flag.value.(*bool) = true
-			return flag, nil
+
+	// Boolean flags are true when present without an explicit value.
+	if valueIndex >= len(argv) {
+		if f.flagType == flagBool {
+			*f.value.(*bool) = true
+			return f, nil
 		}
-		return flag, fmt.Errorf("missing value for flag [-%s | --%s]", flag.shortName, flag.name)
+		return f, fmt.Errorf("missing value for flag [-%s | --%s]", f.shortName, f.name)
 	}
 
-	if argv[valueIndex] == "" {
-		// empty string, accessing argv[valueIndex][0] will panic.
-		return flag, fmt.Errorf("empty value for flag [-%s | --%s]", flag.shortName, flag.name)
+	next := argv[valueIndex]
+	if next == "" {
+		return f, fmt.Errorf("empty value for flag [-%s | --%s]", f.shortName, f.name)
 	}
 
-	if argv[valueIndex][0] == '-' {
-		if flag.flagType == flagBool { // bool falg may have no value.
-			*flag.value.(*bool) = true
-			return flag, nil
+	if next[0] == '-' {
+		if f.flagType == flagBool {
+			*f.value.(*bool) = true
+			return f, nil
 		}
-		return flag, fmt.Errorf("missing value for flag [-%s | --%s]", flag.shortName, flag.name)
+		return f, fmt.Errorf("missing value for flag [-%s | --%s]", f.shortName, f.name)
 	}
 
-	var err error
-	value := argv[valueIndex]
-	err = parseFlagValue(flag, value)
-	if err != nil {
-		return flag, err
+	if err := parseFlagValue(f, next); err != nil {
+		return f, err
 	}
 
-	// validate the flag by calling all validators in sequence.
-	for _, validator := range flag.validators {
-		if validator != nil {
-			// dereference the pointer to get the value.
-			value := reflect.ValueOf(flag.value).Elem().Interface()
-			if valid, errMsg := validator(value); !valid {
-				return flag, fmt.Errorf("invalid value (%v) for flag [--%s]: %v", value, flag.name, errMsg)
-			}
+	// Run validators against the dereferenced, typed value.
+	for _, v := range f.validators {
+		if v == nil {
+			continue
+		}
+		concrete := reflect.ValueOf(f.value).Elem().Interface()
+		if ok, msg := v(concrete); !ok {
+			return f, fmt.Errorf("invalid value (%v) for flag [--%s]: %s", concrete, f.name, msg)
 		}
 	}
-	return flag, nil
+
+	return f, nil
 }
 
-// Print a flag to the writer.
-// Called by PrintUsage for each flag.
+// findFlag searches flags by long name or short name and returns the first match.
+func findFlag(flags []*Flag, name string) *Flag {
+	for _, f := range flags {
+		if f.name == name || f.shortName == name {
+			return f
+		}
+	}
+	return nil
+}
+
+func isHelpFlag(name string) bool {
+	return name == "help" || name == "h"
+}
+
+// printFlag writes a single flag's help line to w, aligned using longestFlagName.
 func printFlag(flag *Flag, w io.Writer, longestFlagName int, indent string) {
 	fmt.Fprintf(w, "%s--%-*s ", indent, longestFlagName, flag.name)
-	valid := reflect.ValueOf(flag.value).IsValid()
+
 	value := ""
-	if valid {
-		value = fmt.Sprintf("%v", reflect.ValueOf(flag.value).Elem().Interface())
+	if v := reflect.ValueOf(flag.value); v.IsValid() {
+		value = fmt.Sprintf("%v", v.Elem().Interface())
 	}
 
 	if flag.flagType == flagString {
@@ -419,65 +526,42 @@ func printFlag(flag *Flag, w io.Writer, longestFlagName int, indent string) {
 			fmt.Fprintf(w, "%s (default: %v)\n", flag.usage, value)
 		}
 	}
-
 }
 
-// Parse the flag value and set the flag value.
-func findFlag(flags []*Flag, name string) *Flag {
-	for index := range flags {
-		flag := flags[index]
-		if flag.name == name || flag.shortName == name {
-			return flag
-		}
-	}
-	return nil
-}
-
-func isHelpFlag(name string) bool {
-	return name == "help" || name == "h"
-}
-
-// Print a subcommand to the writer.
-// Called by PrintUsage for each subcommand.
+// printSubCommand writes a subcommand's name, description, and flags to w.
 func printSubCommand(cmd *SubCMD, w io.Writer) {
-	fmt.Fprintf(w, "%s: %s", cmd.name, cmd.description)
-	fmt.Fprintln(w)
+	fmt.Fprintf(w, "%s: %s\n", cmd.name, cmd.description)
 
-	longestFlagName := 0
-	for _, flag := range cmd.flags {
-		if flag.name == "help" {
-			continue
-		}
-		if len(flag.name) > longestFlagName {
-			longestFlagName = len(flag.name)
+	longest := 0
+	for _, f := range cmd.flags {
+		if f.name != "help" && len(f.name) > longest {
+			longest = len(f.name)
 		}
 	}
-
-	// print the subcommand flags.
-	for _, flag := range cmd.flags {
-		if flag.name == "help" {
+	for _, f := range cmd.flags {
+		if f.name == "help" {
 			continue
 		}
-		printFlag(flag, w, longestFlagName, "    ")
+		printFlag(f, w, longest, "    ")
+	}
+
+	// Print nested subcommands if any.
+	if len(cmd.subcommands) > 0 {
+		fmt.Fprintf(w, "  Subcommands:\n")
+		for _, child := range cmd.subcommands {
+			fmt.Fprintf(w, "    %s: %s\n", child.name, child.description)
+		}
 	}
 
 	fmt.Fprintln(w)
 }
 
-// PrintUsage prints the usage message to the writer.
+// PrintUsage writes the full usage message (global flags + subcommand list) to w.
 func (c *CLI) PrintUsage(w io.Writer) {
-	longestFlagName := 0
-	for _, flag := range c.flags {
-		if len(flag.name) > longestFlagName {
-			longestFlagName = len(flag.name)
-		}
-	}
-
-	// find the longest subcommand name.
-	longestSubCommandName := 0
-	for _, cmd := range c.subcommands {
-		if len(cmd.name) > longestSubCommandName {
-			longestSubCommandName = len(cmd.name)
+	longest := 0
+	for _, f := range c.flags {
+		if len(f.name) > longest {
+			longest = len(f.name)
 		}
 	}
 
@@ -486,21 +570,17 @@ func (c *CLI) PrintUsage(w io.Writer) {
 		programName = os.Args[0]
 	}
 
-	fmt.Fprintf(w, "Usage: %s [global flags] [subcommand] [subcommand flags]\n", programName)
+	fmt.Fprintf(w, "Usage: %s [global flags] [subcommand] [subcommand flags] [args...]\n", programName)
 	if c.description != "" {
 		fmt.Fprintf(w, "%s\n", c.description)
 	}
 
-	// print the global flags.
-	fmt.Fprintf(w, "Global Flags:\n")
-	for _, flag := range c.flags {
-		printFlag(flag, w, longestFlagName, "  ")
+	fmt.Fprintf(w, "\nGlobal Flags:\n")
+	for _, f := range c.flags {
+		printFlag(f, w, longest, "  ")
 	}
 
-	fmt.Fprintln(w)
-
-	// print the subcommands.
-	fmt.Fprintf(w, "Subcommands:\n")
+	fmt.Fprintf(w, "\nSubcommands:\n")
 	for _, cmd := range c.subcommands {
 		printSubCommand(cmd, w)
 	}
