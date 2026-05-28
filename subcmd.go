@@ -81,7 +81,7 @@ func (cmd *SubCMD) Flag(ft flagType, name, shortName string, valuePtr any, usage
 		shortName:  shortName,
 		value:      valuePtr,
 		usage:      usage,
-		validators: make([]FlagValidator, 0),
+		validators: []FlagValidator{},
 	}
 	validateFlag(f)
 	cmd.flags = append(cmd.flags, f)
@@ -100,7 +100,7 @@ func (cmd *SubCMD) PersistentFlag(ft flagType, name, shortName string, valuePtr 
 		shortName:  shortName,
 		value:      valuePtr,
 		usage:      usage,
-		validators: make([]FlagValidator, 0),
+		validators: []FlagValidator{},
 	}
 	validateFlag(f)
 	cmd.persistentFlags = append(cmd.persistentFlags, f)

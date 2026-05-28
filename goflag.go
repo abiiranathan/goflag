@@ -57,8 +57,8 @@ const (
 
 // FlagValidator is a user-supplied validation function called after a flag's
 // value has been parsed. It receives the concrete (dereferenced) value and
-// must return (true, "") on success or (false, errorMessage) on failure.
-type FlagValidator func(value any) (valid bool, errmsg string)
+// must return nil on success or error on failure.
+type FlagValidator func(value any) error
 
 // Flag represents a single command-line flag with its type, names, default
 // value pointer, usage string, and optional validators.
@@ -518,8 +518,8 @@ func parseFlags(flags *[]*Flag, name string, i int, argv []string) (*Flag, error
 			continue
 		}
 		concrete := reflect.ValueOf(f.value).Elem().Interface()
-		if ok, msg := v(concrete); !ok {
-			return f, fmt.Errorf("invalid value (%v) for flag [--%s]: %s", concrete, f.name, msg)
+		if err := v(concrete); err != nil {
+			return f, fmt.Errorf("invalid value (%v) for flag [--%s]: %s", concrete, f.name, err.Error())
 		}
 	}
 

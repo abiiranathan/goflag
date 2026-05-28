@@ -7,72 +7,93 @@ import (
 )
 
 // Choices returns a validator function that checks if the provided value is one of the allowed choices.
-func Choices[T comparable](choices []T) func(v any) (bool, string) {
-	return func(v any) (bool, string) {
+func Choices[T comparable](choices []T) func(v any) error {
+	return func(v any) error {
 		concreteType, ok := v.(T)
 		if !ok {
-			return false, fmt.Sprintf("Invalid generic type for %v", v)
+			return fmt.Errorf("invalid generic type for %v", v)
 		}
 		if slices.Contains(choices, concreteType) {
-			return true, ""
+			return nil
 		}
-		return false, fmt.Sprintf("Expected value to be one of: %v", choices)
+		return fmt.Errorf("expected value to be one of: %v", choices)
 	}
 }
 
 // MinStringLen returns a validator function that checks if the provided string value has a minimum length.
-func MinStringLen(length int) func(v any) (bool, string) {
-	return func(v any) (bool, string) {
+func MinStringLen(length int) func(v any) error {
+	return func(v any) error {
 		s, ok := v.(string)
 		if !ok {
-			return false, "MinStringLen must be used only with strings"
+			return fmt.Errorf("MinStringLen must be used only with strings")
 		}
 
-		return len(s) >= length, ""
+		if len(s) < length {
+			return fmt.Errorf("string must be at least %d characters long", length)
+		}
+		return nil
 	}
 }
 
 // MaxStringLen returns a validator function that checks if the provided string value has a maximum length.
-func MaxStringLen(length int) func(v any) (bool, string) {
-	return func(v any) (bool, string) {
+func MaxStringLen(length int) func(v any) error {
+	return func(v any) error {
 		s, ok := v.(string)
 		if !ok {
-			return false, "MaxStringLen must be used only with strings"
+			return fmt.Errorf("MaxStringLen must be used only with strings")
 		}
 
-		return len(s) <= length, ""
+		if len(s) > length {
+			return fmt.Errorf("string must be at most %d characters long", length)
+		}
+		return nil
 	}
 }
 
 // Max returns a validator function that checks if the provided value is less than or equal to the specified maximum value.
-func Max[T cmp.Ordered](maxValue T) func(v any) (bool, string) {
-	return func(v any) (bool, string) {
+func Max[T cmp.Ordered](maxValue T) func(v any) error {
+	return func(v any) error {
 		value := v.(T)
-		return value <= maxValue, fmt.Sprintf("value %v is greater than maximum value: %v", v, maxValue)
+		if value > maxValue {
+			return fmt.Errorf("value %v is greater than maximum value: %v", v, maxValue)
+		}
+		return nil
 	}
 }
 
 // Min returns a validator function that checks if the provided value is greater than or equal to the specified minimum value.
-func Min[T cmp.Ordered](minValue T) func(v any) (bool, string) {
-	return func(v any) (bool, string) {
+func Min[T cmp.Ordered](minValue T) func(v any) error {
+	return func(v any) error {
 		value := v.(T)
-		return value >= minValue, fmt.Sprintf("value %v is less than minimum value: %v", v, minValue)
+		if value < minValue {
+			return fmt.Errorf("value %v is less than minimum value: %v", v, minValue)
+		}
+		return nil
 	}
 }
 
 // Range returns a validator function that checks if the provided value is within the specified range (inclusive).
-func Range[T cmp.Ordered](minValue, maxValue T) func(v any) (bool, string) {
-	return func(v any) (bool, string) {
+func Range[T cmp.Ordered](minValue, maxValue T) func(v any) error {
+	return func(v any) error {
 		value := v.(T)
-		return value >= minValue && value <= maxValue, fmt.Sprintf("value %v is not in range [%v, %v]", v, minValue, maxValue)
+		if value < minValue {
+			return fmt.Errorf("value %v is less than minimum value: %v", v, minValue)
+		}
+		if value > maxValue {
+			return fmt.Errorf("value %v is greater than maximum value: %v", v, maxValue)
+		}
+		return nil
 	}
 }
 
 // NotEmpty returns a validator function that checks if the provided string value is not empty.
-func NotEmpty(v any) (bool, string) {
+func NotEmpty(v any) error {
 	s, ok := v.(string)
 	if !ok {
-		return false, "NotEmpty validator can only be used with strings"
+		return fmt.Errorf("NotEmpty validator can only be used with strings")
 	}
-	return s != "", "value cannot be empty"
+	if s == "" {
+		return fmt.Errorf("value cannot be empty")
+	}
+	return nil
 }

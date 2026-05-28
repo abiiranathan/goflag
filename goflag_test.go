@@ -29,8 +29,11 @@ func TestParse(t *testing.T) {
 					required:  true,
 					usage:     "Your name",
 					validators: []FlagValidator{
-						func(value any) (valid bool, errmsg string) {
-							return value != "", "name cannot be empty"
+						func(value any) error {
+							if value == "" {
+								return errors.New("name cannot be empty")
+							}
+							return nil
 						},
 					},
 				},
@@ -50,8 +53,11 @@ func TestParse(t *testing.T) {
 					required:  true,
 					usage:     "Your height",
 					validators: []FlagValidator{
-						func(a any) (bool, string) {
-							return a.(int) > 0, "height must be greater than 0"
+						func(a any) error {
+							if a.(int) <= 0 {
+								return errors.New("height must be greater than 0")
+							}
+							return nil
 						},
 					},
 				},
@@ -85,8 +91,11 @@ func TestParse(t *testing.T) {
 					required:  true,
 					usage:     "Your height",
 					validators: []FlagValidator{
-						func(a any) (bool, string) {
-							return a.(int) > 0, "height must be greater than 0"
+						func(a any) error {
+							if a.(int) <= 0 {
+								return errors.New("height must be greater than 0")
+							}
+							return nil
 						},
 					},
 				},
