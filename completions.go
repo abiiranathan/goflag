@@ -206,6 +206,8 @@ func (c *CLI) GenZshCompletion(w io.Writer) {
 }
 
 // writeZshFlagSpec emits a single zsh _arguments flag specification line.
+// writeZshFlagSpec emits a single zsh _arguments flag specification line
+// without a trailing newline, so callers can append a continuation or newline.
 func writeZshFlagSpec(w io.Writer, f *Flag, indent string) {
 	desc := strings.ReplaceAll(f.usage, "]", "\\]")
 	desc = strings.ReplaceAll(desc, "'", "'\\''")
@@ -213,7 +215,6 @@ func writeZshFlagSpec(w io.Writer, f *Flag, indent string) {
 	argSpec := ""
 	switch f.flagType {
 	case flagBool:
-		// no argument
 	case flagDirPath:
 		argSpec = ":dir:_files -/"
 	case flagFilePath:
@@ -222,7 +223,7 @@ func writeZshFlagSpec(w io.Writer, f *Flag, indent string) {
 		argSpec = ":value:"
 	}
 
-	fmt.Fprintf(w, "%s'--%s[%s]%s'\n", indent, f.name, desc, argSpec)
+	fmt.Fprintf(w, "%s'--%s[%s]%s'", indent, f.name, desc, argSpec) // no \n
 }
 
 // writeZshSubCommandCase emits the zsh state-machine case arm for cmd,
